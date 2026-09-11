@@ -1,0 +1,171 @@
+// VetSurgeryTR — Sistema de gestión de cirugía ortopédica veterinaria
+// Modelo extraído y mejorado a partir del dominio de ISALAB-TR
+// (propietarios, pacientes, estados de cirugía) + módulos nuevos:
+// inventario ortopédico, materiales por cirugía y controles postoperatorios.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================ PROPIETARIOS ==================================
+
+model Owner {
+  id             String    @id @default(cuid())
+  documentType   String // CC | TI | CE | NIT | PA
+  documentNumber String
+  fullName       String
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  patients       Patient[]
+
+  @@unique([documentType, documentNumber])
+}
+
+// ============================== PACIENTES ===================================
+
+model Patient {
+  id        String    @id @default(cuid())
+  code      String    @unique // PAC-YYYY-NNNN
+  ownerId   String
+  owner     Owner     @relation(fields: [ownerId], references: [id])
+  name      String
+  species   String // Canino | Felino | Equino | ...
+  breed     String?
+  sex       String // M | F
+  birthDate DateTime?
+  weight    Float? // kg — crítico para dosificación e implantes
+  neutered  Boolean   @default(false)
+  color     String?
+  microchip String?   @unique
+  active    Boolean   @default(true)
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  surgeries Surgery[]
+}
+
+// ============================ VETERINARIOS ==================================
+
+model Vet {
+  id        String    @id @default(cuid())
+  fullName  String
+  license   String? // Tarjeta profesional MV
+  specialty String?
+  phone     String?
+  email     String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  surgeries Surgery[]
+}
+
+// ========================= INVENTARIO ORTOPÉDICO ============================
+
+model InventoryItem {
+  id         String            @id @default(cuid())
+  code       String            @unique // INV-NNNN
+  name       String
+  category   String // PLACAS | TORNILLOS | PINES | ALAMBRES | FIJADORES | INJERTOS | INSTRUMENTAL | SUTURAS | MEDICAMENTOS | INSUMOS
+  subType    String? // LCP, cortical, Kirschner, Steinmann...
+  material   String? // Acero 316L, Titanio, PDS...
+  size       String? // 2.7 mm, 3.5 mm, 1.6 mm x 15 cm...
+  unit       String // pieza | caja | paquete | metro | frasco
+  stockQty   Float             @default(0)
+  minStock   Float             @default(0)
+  unitCost   Float? // COP
+  supplier   String?
+  lotNumber  String?
+  expiresAt  DateTime?
+  location   String?
+  active     Boolean           @default(true)
+  notes      String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  movements       InventoryMovement[]
+  surgeryMaterials SurgeryMaterial[]
+}
+
+// ENTRADA suma stock · SALIDA resta · AJUSTE fija el stock absoluto (inventario físico)
+model InventoryMovement {
+  id        String         @id @default(cuid())
+  itemId    String
+  item      InventoryItem  @relation(fields: [itemId], references: [id])
+  type      String // ENTRADA | SALIDA | AJUSTE
+  qty       Float // ENTRADA/SALIDA: delta · AJUSTE: valor final contado
+  stockAfter Float // snapshot del stock resultante
+  unitCost  Float?
+  reason    String?
+  surgeryId String? // origen cuando la salida es consumo quirúrgico
+  surgery   Surgery?       @relation(fields: [surgeryId], references: [id])
+  createdAt DateTime       @default(now())
+}
+
+// =============================== CIRUGÍAS ===================================
+
+model Surgery {
+  id                 String    @id @default(cuid())
+  code               String    @unique // CIR-YYYY-NNNN
+  patientId          String
+  patient            Patient   @relation(fields: [patientId], references: [id])
+  vetId              String?
+  vet                Vet?      @relation(fields: [vetId], references: [id])
+  procedureType      String // TPLO | TTA | Reparación de fractura | Artrodesis | ...
+  bodyRegion         String? // Fémur distal, Tibia proximal, Radio/ulna...
+  laterality         String? // Izquierda | Derecha | Bilateral | No aplica
+  description        String?
+  scheduledAt        DateTime
+  durationMin        Int? // duración quirúrgica estimada
+  anesthesiaType     String?
+  asaRisk            Int? // ASA I–V
+  preoperativeNotes  String? // radiografías, laboratorio, ayuno
+  postoperativeNotes String? // protocolo analgesia, reposo, curaciones
+  estimatedCost      Float? // COP
+  status             String    @default("PROGRAMADA") // PROGRAMADA | EN_CURSO | COMPLETADA | CANCELADA
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  materials  SurgeryMaterial[]
+  movements  InventoryMovement[]
+  followUps  FollowUp[]
+}
+
+// Materiales planificados/consumidos por cirugía (platinas, clavos, tornillos...)
+model SurgeryMaterial {
+  id         String         @id @default(cuid())
+  surgeryId  String
+  surgery    Surgery        @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       InventoryItem  @relation(fields: [itemId], references: [id])
+  qtyPlanned Float          @default(0)
+  qtyUsed    Float? // se registra al completar la cirugía
+  unitCost   Float? // snapshot del costo unitario
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([surgeryId, itemId])
+}
+
+// Controles postoperatorios (radiografías de control, curaciones, retiro de puntos/implantes)
+model FollowUp {
+  id            String    @id @default(cuid())
+  surgeryId     String
+  surgery       Surgery   @relation(fields: [surgeryId], references: [id], onDelete: Cascade)
+  scheduledDate DateTime
+  type          String // CONTROL_RADIOGRAFICO | CURACION | RETIRO_PUNTOS | EVALUACION | RETIRO_IMPLANTES
+  notes         String?
+  status        String    @default("PENDIENTE") // PENDIENTE | CUMPLIDO | PERDIDO
+  doneAt        DateTime?
+  createdAt     DateTime  @default(now())
+}

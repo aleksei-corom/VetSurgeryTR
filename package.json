@@ -1,0 +1,32 @@
+{
+  "name": "vetsurgerytr",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "VetSurgeryTR — Gestión de cirugía ortopédica veterinaria (Tauri v2 + Rust + Firebird 5 Embedded + React 19)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.6.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "~5.6.3",
+    "vite": "^6.3.5"
+  }
+}

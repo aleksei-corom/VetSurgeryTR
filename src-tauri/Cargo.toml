@@ -1,0 +1,47 @@
+[package]
+name = "vetsurgerytr"
+version = "1.0.0"
+description = "Sistema de gestión de cirugía ortopédica veterinaria (Firebird 5 Embedded)"
+authors = ["VetSurgeryTR"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "vetsurgerytr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+# Utilidades de fecha: formateo ISO de las fechas Firebird y ventanas del
+# dashboard (últimos 6 meses, mes en curso).
+chrono = "0.4"
+
+# ---- Firebird 5 Embedded ----
+# `dynamic_loading` localiza fbclient.dll/libfbclient.so en tiempo de
+# ejecución (incluida en src-tauri/binaries/firebird/ y empaquetada como
+# recurso). Sin `linking` para no requerir la librería al compilar.
+rsfbclient = { version = "0.27", default-features = false, features = ["dynamic_loading"] }
+
+[profile.dev]
+incremental = false
+codegen-units = 1
+
+[profile.dev.package."*"]
+incremental = false
+codegen-units = 1
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+

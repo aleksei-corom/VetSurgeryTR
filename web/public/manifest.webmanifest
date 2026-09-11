@@ -1,0 +1,34 @@
+{
+  "name": "VetSurgeryTR",
+  "short_name": "VetSurgeryTR",
+  "description": "Sistema de gestión para clínicas veterinarias especializadas en cirugía ortopédica: pacientes, agenda quirúrgica e inventario de implantes.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0d7d74",
+  "lang": "es",
+  "categories": ["medical", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

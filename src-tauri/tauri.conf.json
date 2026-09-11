@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VetSurgeryTR",
+  "version": "1.0.0",
+  "identifier": "com.vetsurgerytr.app",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "VetSurgeryTR · Cirugía Ortopédica Veterinaria",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 560,
+        "minHeight": 480,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob:; connect-src 'self' ipc: http://ipc.localhost",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "resources": ["binaries/firebird/**/*"],
+    "shortDescription": "Gestión de cirugía ortopédica veterinaria",
+    "longDescription": "VetSurgeryTR — pacientes, cirugías ortopédicas, inventario de implantes con consumo por cirugía y controles postoperatorios. Tauri v2 · Rust · Firebird 5 Embedded.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
