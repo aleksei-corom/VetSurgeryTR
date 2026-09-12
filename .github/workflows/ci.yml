@@ -7,6 +7,10 @@
 #    contra Firebird 5 Embedded REAL: la librería completa (fbclient.dll +
 #    ICU + plugins) está versionada en src-tauri/binaries/firebird/.
 #
+# Versiones de actions: checkout v5+ corre sobre Node 24 (v4 dispara
+# avisos de deprecación Node 20 en los runners); setup-bun v2 y
+# rust-cache v2 ya resuelven a node24 en sus últimas releases.
+#
 # Nota: frontendDist (../dist) está gitignoreado pero tauri-build NO lo
 # exige para `cargo check`/`cargo test` (verificado), así que los dos
 # trabajos corren en paralelo sin compartir artefactos.
@@ -27,7 +31,7 @@ jobs:
     name: Frontend · typecheck + build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -53,7 +57,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
