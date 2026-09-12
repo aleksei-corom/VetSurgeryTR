@@ -410,6 +410,12 @@ se respeta con `--locked` en todo el job de Rust.
 
 #### Protección de la rama (recomendado)
 
+> **✅ Configurada.** `master` ya está protegida vía API con los tres checks requeridos
+> (`Frontend · typecheck + build`, `Rust · check + tests`, `Rust · tests + Firebird smoke`),
+> «branches up to date» (strict), **enforce_admins** activo y sin force-push ni borrado.
+> Approvals requeridos: 0 (unipersonal) — súbelo a 1 en Settings si se suma gente. Si algún día
+> renombras un job del workflow, actualiza los contexts en *Settings → Branches → master*.
+
 Para que el badge signifique algo, configura `master` para **no aceptar nada que no haya pasado
 CI** — GitHub → *Settings → Branches → Add branch protection rule* sobre `master`:
 
