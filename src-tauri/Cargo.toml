@@ -1,6 +1,6 @@
 [package]
 name = "vetsurgerytr"
-version = "1.0.0"
+version = "1.0.1"
 description = "Sistema de gestión de cirugía ortopédica veterinaria (Firebird 5 Embedded)"
 authors = ["VetSurgeryTR"]
 edition = "2021"

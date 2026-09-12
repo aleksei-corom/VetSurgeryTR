@@ -1,7 +1,7 @@
 {
   "name": "vetsurgerytr",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "VetSurgeryTR — Gestión de cirugía ortopédica veterinaria (Tauri v2 + Rust + Firebird 5 Embedded + React 19)",
   "engines": {
