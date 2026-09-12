@@ -80,6 +80,10 @@ pub struct Surgery {
     /// Izquierda | Derecha | Bilateral | No aplica
     pub laterality: Option<String>,
     pub description: Option<String>,
+    /// Diagnóstico presuntivo (antes/durante la cirugía: motivo quirúrgico).
+    pub presumptive_diagnosis: Option<String>,
+    /// Diagnóstico definitivo (hallazgo confirmado, postoperatorio).
+    pub definitive_diagnosis: Option<String>,
     /// YYYY-MM-DD HH:MM:SS
     pub scheduled_at: String,
     /// Duración quirúrgica estimada (minutos)
@@ -127,6 +131,7 @@ pub struct CreateSurgeryInput {
     pub body_region: Option<String>,
     pub laterality: Option<String>,
     pub description: Option<String>,
+    pub presumptive_diagnosis: Option<String>,
     /// YYYY-MM-DD HH:MM:SS (acepta también YYYY-MM-DD)
     pub scheduled_at: String,
     pub duration_min: Option<i32>,
@@ -153,6 +158,8 @@ pub struct UpdateSurgeryInput {
     pub body_region: Option<String>,
     pub laterality: Option<String>,
     pub description: Option<String>,
+    pub presumptive_diagnosis: Option<String>,
+    pub definitive_diagnosis: Option<String>,
     pub scheduled_at: Option<String>,
     pub duration_min: Option<i32>,
     pub anesthesia_type: Option<String>,

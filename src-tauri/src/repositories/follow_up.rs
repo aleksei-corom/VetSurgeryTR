@@ -124,12 +124,17 @@ pub fn update(
 
     let notes = input.notes.clone().or(current.notes);
 
+    // Flag entero en vez de comparar ? contra el literal 'CUMPLIDO' (8
+    // chars): Firebird inferiría VARCHAR(8) y rechazaría 'PENDIENTE' (9)
+    // con "string right truncation".
+    let done_flag: i32 = if input.status == "CUMPLIDO" { 1 } else { 0 };
+
     conn.execute(
         "UPDATE FOLLOW_UPS
             SET STATUS = ?, NOTES = ?,
-                DONE_AT = CASE WHEN ? = 'CUMPLIDO' THEN CURRENT_TIMESTAMP ELSE DONE_AT END
+                DONE_AT = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE DONE_AT END
           WHERE ID = ?",
-        (&input.status, &notes, &input.status, &follow_up_id),
+        (&input.status, &notes, &done_flag, &follow_up_id),
     )
     .map_err(AppError::from)?;
 
@@ -137,26 +142,29 @@ pub fn update(
         .ok_or_else(|| AppError::Internal("Control actualizado pero no recuperado".into()))
 }
 
+/// Fila plana de controles vencidos (rsfbclient solo extrae tuplas planas).
+type FollowUpDueRow = (
+    i32,
+    i32,
+    String,
+    String,
+    Option<String>,
+    String,
+    Option<String>,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+
 /// Controles PENDIENTE vencidos (fecha <= hoy) con su cirugía y paciente
 /// (lista del dashboard). Máx. `limit`.
 pub fn list_due(
     conn: &mut SimpleConnection,
     limit: i32,
 ) -> Result<Vec<FollowUpDueItem>, AppError> {
-    let rows: Vec<(
-        i32,
-        i32,
-        String,
-        String,
-        Option<String>,
-        String,
-        Option<String>,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let rows: Vec<FollowUpDueRow> = conn
         .query(
             &format!(
                 "SELECT f.ID, f.SURGERY_ID, LEFT(CAST(f.SCHEDULED_DATE AS VARCHAR(60)), 19),

@@ -6,6 +6,11 @@ dist-ssr
 .env.*
 !.env.example
 
+# Logs locales de desarrollo
+tauri-dev.log
+vite-dev.log
+*.log
+
 # Tauri
 src-tauri/target/
 src-tauri/gen/

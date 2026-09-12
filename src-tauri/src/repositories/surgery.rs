@@ -18,6 +18,7 @@ use crate::repositories::{fmt_qty, next_id, with_tx};
 const SURGERY_SELECT: &str = "
     SELECT s.ID, s.CODE, s.PATIENT_ID, s.VET_ID, s.PROCEDURE_TYPE, s.BODY_REGION,
            s.LATERALITY, s.DESCRIPTION,
+           s.PRESUMPTIVE_DIAGNOSIS, s.DEFINITIVE_DIAGNOSIS,
            LEFT(CAST(s.SCHEDULED_AT AS VARCHAR(60)), 19), s.DURATION_MIN,
            s.ANESTHESIA_TYPE, s.ASA_RISK, s.PREOPERATIVE_NOTES, s.POSTOPERATIVE_NOTES,
            s.ESTIMATED_COST, s.STATUS,
@@ -52,12 +53,27 @@ const MATERIAL_SELECT: &str = "
     FROM SURGERY_MATERIALS sm
     JOIN INVENTORY_ITEMS i ON i.ID = sm.ITEM_ID";
 
-/// Columnas de un control postoperatorio.
-const FOLLOW_UP_SELECT: &str = "
-    SELECT f.ID, f.SURGERY_ID, LEFT(CAST(f.SCHEDULED_DATE AS VARCHAR(60)), 19),
-           f.CONTROL_TYPE, f.NOTES, f.STATUS, LEFT(CAST(f.DONE_AT AS VARCHAR(60)), 19),
-           LEFT(CAST(f.CREATED_AT AS VARCHAR(60)), 19)
-    FROM FOLLOW_UPS f";
+/// Fila plana de un material de cirugía con su ítem unido (ver MATERIAL_SELECT):
+/// (material_id, surgery_id, item_id, planned, used, unit_cost, notas,
+///  item_id, item_code, item_name, item_category, item_size, item_unit,
+///  item_stock, item_min_stock).
+type SurgeryMaterialRow = (
+    i32,
+    i32,
+    i32,
+    f64,
+    Option<f64>,
+    Option<f64>,
+    Option<String>,
+    i32,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    f64,
+    f64,
+);
 
 pub(crate) type SurgeryRow = (
     i32,            // id
@@ -68,6 +84,8 @@ pub(crate) type SurgeryRow = (
     Option<String>, // body_region
     Option<String>, // laterality
     Option<String>, // description
+    Option<String>, // presumptive_diagnosis
+    Option<String>, // definitive_diagnosis
     String,         // scheduled_at
     Option<i32>,    // duration_min
     Option<String>, // anesthesia_type
@@ -87,23 +105,63 @@ pub(crate) type SurgeryRow = (
     f64,            // materials_cost
 );
 
+/// Extrae una SurgeryRow desde un Row dinámico: rsfbclient solo implementa
+/// FromRow para tuplas hasta 26 columnas y esta consulta tiene 27 — los
+/// índices deben cuadrar EXACTO con SURGERY_SELECT.
+fn surgery_row_from(row: rsfbclient::Row) -> Result<SurgeryRow, AppError> {
+    Ok((
+        row.get(0)?,
+        row.get(1)?,
+        row.get(2)?,
+        row.get(3)?,
+        row.get(4)?,
+        row.get(5)?,
+        row.get(6)?,
+        row.get(7)?,
+        row.get(8)?,
+        row.get(9)?,
+        row.get(10)?,
+        row.get(11)?,
+        row.get(12)?,
+        row.get(13)?,
+        row.get(14)?,
+        row.get(15)?,
+        row.get(16)?,
+        row.get(17)?,
+        row.get(18)?,
+        row.get(19)?,
+        row.get(20)?,
+        row.get(21)?,
+        row.get(22)?,
+        row.get(23)?,
+        row.get(24)?,
+        row.get(25)?,
+        row.get(26)?,
+    ))
+}
+
+/// Fila plana del paciente anidado en una cirugía:
+/// (id, nombre, especie, raza, sexo, peso, microchip, edad, propietario_id,
+///  propietario, teléfono, ciudad, dirección).
+type PatientRefRow = (
+    i32,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    Option<f64>,
+    Option<String>,
+    Option<i32>,
+    i32,
+    String,
+    Option<String>,
+    Option<String>,
+);
+
 /// Resuelve el paciente anidado de una cirugía.
 fn patient_ref(conn: &mut SimpleConnection, patient_id: i32) -> Result<SurgeryPatientRef, AppError> {
-    let row: Option<(
-        i32,
-        String,
-        String,
-        String,
-        Option<String>,
-        String,
-        Option<f64>,
-        Option<String>,
-        Option<i32>,
-        i32,
-        String,
-        Option<String>,
-        Option<String>,
-    )> = conn
+    let row: Option<PatientRefRow> = conn
         .query_first(&format!("{PATIENT_REF_SELECT} WHERE p.ID = ?"), (&patient_id,))
         .map_err(AppError::from)?;
 
@@ -139,25 +197,27 @@ fn map_surgery(r: SurgeryRow, patient: SurgeryPatientRef) -> Surgery {
         body_region: r.5,
         laterality: r.6,
         description: r.7,
-        scheduled_at: r.8,
-        duration_min: r.9,
-        anesthesia_type: r.10,
-        asa_risk: r.11,
-        preoperative_notes: r.12,
-        postoperative_notes: r.13,
-        estimated_cost: r.14,
-        status: r.15,
-        started_at: r.16,
-        completed_at: r.17,
-        created_at: r.18,
-        updated_at: r.19,
-        vet: r.20.map(|vid| VetRef {
+        presumptive_diagnosis: r.8,
+        definitive_diagnosis: r.9,
+        scheduled_at: r.10,
+        duration_min: r.11,
+        anesthesia_type: r.12,
+        asa_risk: r.13,
+        preoperative_notes: r.14,
+        postoperative_notes: r.15,
+        estimated_cost: r.16,
+        status: r.17,
+        started_at: r.18,
+        completed_at: r.19,
+        created_at: r.20,
+        updated_at: r.21,
+        vet: r.22.map(|vid| VetRef {
             id: vid,
-            full_name: r.21.unwrap_or_default(),
-            specialty: r.22,
+            full_name: r.23.unwrap_or_default(),
+            specialty: r.24,
         }),
-        materials_count: r.23,
-        materials_cost: r.24,
+        materials_count: r.25,
+        materials_cost: r.26,
         patient,
     }
 }
@@ -167,11 +227,12 @@ fn load_surgery_row(
     where_clause: &str,
     params: (&i32,),
 ) -> Result<Option<Surgery>, AppError> {
-    let row: Option<SurgeryRow> = conn
+    let row: Option<rsfbclient::Row> = conn
         .query_first(&format!("{SURGERY_SELECT} {where_clause}"), params)
         .map_err(AppError::from)?;
     match row {
-        Some(r) => {
+        Some(row) => {
+            let r = surgery_row_from(row)?;
             let patient = patient_ref(conn, r.2)?;
             Ok(Some(map_surgery(r, patient)))
         }
@@ -216,7 +277,7 @@ pub fn list(
         .map(|s| format!("%{}%", s.trim()))
         .filter(|s| !s.trim_matches('%').is_empty());
 
-    let rows: Vec<SurgeryRow> = conn
+    let rows: Vec<rsfbclient::Row> = conn
         .query(
             &format!(
                 "{SURGERY_SELECT}
@@ -238,7 +299,8 @@ pub fn list(
         .map_err(AppError::from)?;
 
     rows.into_iter()
-        .map(|r| {
+        .map(|row| {
+            let r = surgery_row_from(row)?;
             let patient = patient_ref(conn, r.2)?;
             Ok(map_surgery(r, patient))
         })
@@ -247,7 +309,7 @@ pub fn list(
 
 /// Próximas cirugías (dashboard): PROGRAMADA/EN_CURSO desde hoy.
 pub fn list_upcoming(conn: &mut SimpleConnection, limit: i32) -> Result<Vec<Surgery>, AppError> {
-    let rows: Vec<SurgeryRow> = conn
+    let rows: Vec<rsfbclient::Row> = conn
         .query(
             &format!(
                 "{SURGERY_SELECT}
@@ -261,7 +323,8 @@ pub fn list_upcoming(conn: &mut SimpleConnection, limit: i32) -> Result<Vec<Surg
         .map_err(AppError::from)?;
 
     rows.into_iter()
-        .map(|r| {
+        .map(|row| {
+            let r = surgery_row_from(row)?;
             let patient = patient_ref(conn, r.2)?;
             Ok(map_surgery(r, patient))
         })
@@ -273,23 +336,7 @@ pub fn list_materials(
     conn: &mut SimpleConnection,
     surgery_id: i32,
 ) -> Result<Vec<SurgeryMaterial>, AppError> {
-    let rows: Vec<(
-        i32,
-        i32,
-        i32,
-        f64,
-        Option<f64>,
-        Option<f64>,
-        Option<String>,
-        i32,
-        String,
-        String,
-        String,
-        Option<String>,
-        String,
-        f64,
-        f64,
-    )> = conn
+    let rows: Vec<SurgeryMaterialRow> = conn
         .query(
             &format!("{MATERIAL_SELECT} WHERE sm.SURGERY_ID = ? ORDER BY sm.ID"),
             (&surgery_id,),
@@ -343,7 +390,11 @@ pub fn transition_allowed(current: &str, new: &str) -> bool {
 
 /// Programa una cirugía (código CIR-YYYY-NNNN por trigger) validando
 /// paciente y veterinario, en transacción.
-pub fn create(conn: &mut SimpleConnection, input: &CreateSurgeryInput) -> Result<SurgeryDetail, AppError> {
+pub fn create(
+    conn: &mut SimpleConnection,
+    input: &CreateSurgeryInput,
+    actor: &str,
+) -> Result<SurgeryDetail, AppError> {
     let patient: Option<(i32,)> = conn
         .query_first("SELECT ID FROM PATIENTS WHERE ID = ?", (&input.patient_id,))
         .map_err(AppError::from)?;
@@ -362,9 +413,10 @@ pub fn create(conn: &mut SimpleConnection, input: &CreateSurgeryInput) -> Result
         conn.execute(
             "INSERT INTO SURGERIES
                 (ID, PATIENT_ID, VET_ID, PROCEDURE_TYPE, BODY_REGION, LATERALITY,
-                 DESCRIPTION, SCHEDULED_AT, DURATION_MIN, ANESTHESIA_TYPE, ASA_RISK,
-                 PREOPERATIVE_NOTES, POSTOPERATIVE_NOTES, ESTIMATED_COST)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 DESCRIPTION, PRESUMPTIVE_DIAGNOSIS, SCHEDULED_AT, DURATION_MIN,
+                 ANESTHESIA_TYPE, ASA_RISK, PREOPERATIVE_NOTES, POSTOPERATIVE_NOTES,
+                 ESTIMATED_COST)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 &id,
                 &input.patient_id,
@@ -373,6 +425,7 @@ pub fn create(conn: &mut SimpleConnection, input: &CreateSurgeryInput) -> Result
                 &input.body_region,
                 &input.laterality,
                 &input.description,
+                &input.presumptive_diagnosis,
                 &input.scheduled_at,
                 &input.duration_min,
                 &input.anesthesia_type,
@@ -384,8 +437,22 @@ pub fn create(conn: &mut SimpleConnection, input: &CreateSurgeryInput) -> Result
         )
         .map_err(AppError::from)?;
 
-        get_detail(conn, id)?
-            .ok_or_else(|| AppError::Internal("Cirugía creada pero no recuperada".into()))
+        // Bitácora: programación de la cirugía (misma transacción).
+        let detail = get_detail(conn, id)?
+            .ok_or_else(|| AppError::Internal("Cirugía creada pero no recuperada".into()))?;
+        crate::repositories::audit::log(
+            conn,
+            actor,
+            "CIRUGIA",
+            Some(id),
+            Some(&detail.surgery.code),
+            "CREAR",
+            Some(format!(
+                "Programó {} · {}",
+                detail.surgery.procedure_type, detail.surgery.scheduled_at
+            )),
+        )?;
+        Ok(detail)
     })
 }
 
@@ -399,6 +466,7 @@ pub fn update(
     conn: &mut SimpleConnection,
     id: i32,
     input: &UpdateSurgeryInput,
+    actor: &str,
 ) -> Result<SurgeryDetail, AppError> {
     let current = get(conn, id)?
         .ok_or_else(|| AppError::NotFound(format!("Cirugía {id} no encontrada")))?;
@@ -416,6 +484,23 @@ pub fn update(
                 "Transición no permitida: {} → {}",
                 current.status, new
             )));
+        }
+    }
+
+    // El diagnóstico definitivo es obligatorio para COMPLETAR una cirugía:
+    // el cierre formal del caso no puede quedar sin el hallazgo confirmado
+    // (los documentos imprimibles lo requieren).
+    if new_status.as_deref() == Some("COMPLETADA") {
+        let definitive = input
+            .definitive_diagnosis
+            .clone()
+            .or(current.definitive_diagnosis.clone())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        if definitive.is_empty() {
+            return Err(AppError::Validation(
+                "Para completar la cirugía debes registrar el diagnóstico definitivo (hallazgo confirmado)".into(),
+            ));
         }
     }
 
@@ -438,6 +523,8 @@ pub fn update(
         || input.body_region.is_some()
         || input.laterality.is_some()
         || input.description.is_some()
+        || input.presumptive_diagnosis.is_some()
+        || input.definitive_diagnosis.is_some()
         || input.scheduled_at.is_some()
         || input.duration_min.is_some()
         || input.anesthesia_type.is_some()
@@ -463,6 +550,14 @@ pub fn update(
         let body_region = input.body_region.clone().or(current.body_region);
         let laterality = input.laterality.clone().or(current.laterality);
         let description = input.description.clone().or(current.description);
+        let presumptive_diagnosis = input
+            .presumptive_diagnosis
+            .clone()
+            .or(current.presumptive_diagnosis);
+        let definitive_diagnosis = input
+            .definitive_diagnosis
+            .clone()
+            .or(current.definitive_diagnosis);
         let scheduled_at = input.scheduled_at.clone().unwrap_or(current.scheduled_at);
         let duration_min = input.duration_min.or(current.duration_min);
         let anesthesia_type = input.anesthesia_type.clone().or(current.anesthesia_type);
@@ -474,13 +569,15 @@ pub fn update(
         conn.execute(
             "UPDATE SURGERIES
                 SET VET_ID = ?, PROCEDURE_TYPE = ?, BODY_REGION = ?, LATERALITY = ?,
-                    DESCRIPTION = ?, SCHEDULED_AT = ?, DURATION_MIN = ?,
+                    DESCRIPTION = ?, PRESUMPTIVE_DIAGNOSIS = ?, DEFINITIVE_DIAGNOSIS = ?,
+                    SCHEDULED_AT = ?, DURATION_MIN = ?,
                     ANESTHESIA_TYPE = ?, ASA_RISK = ?, PREOPERATIVE_NOTES = ?,
                     POSTOPERATIVE_NOTES = ?, ESTIMATED_COST = ?,
                     UPDATED_AT = CURRENT_TIMESTAMP
               WHERE ID = ?",
             (
                 &vet_id, &procedure_type, &body_region, &laterality, &description,
+                &presumptive_diagnosis, &definitive_diagnosis,
                 &scheduled_at, &duration_min, &anesthesia_type, &asa_risk,
                 &preoperative_notes, &postoperative_notes, &estimated_cost, &id,
             ),
@@ -489,17 +586,24 @@ pub fn update(
 
         // 3) Transición de estado: STARTED_AT al entrar en curso,
         //    COMPLETED_AT al completar.
+        let mut status_audit: Option<String> = None;
         if let Some(new) = &new_status {
+            // Flags enteros en vez de comparar ? contra literales de texto:
+            // Firebird infiere el tipo del parámetro desde el literal
+            // ('EN_CURSO' = VARCHAR(8)) y rechazaría 'COMPLETADA' (10 chars)
+            // con "string right truncation".
+            let started_flag: i32 = if new == "EN_CURSO" { 1 } else { 0 };
+            let completed_flag: i32 = if new == "COMPLETADA" { 1 } else { 0 };
             conn.execute(
                 "UPDATE SURGERIES
                     SET STATUS = ?,
-                        STARTED_AT = CASE WHEN ? = 'EN_CURSO'
+                        STARTED_AT = CASE WHEN ? = 1
                                           THEN CURRENT_TIMESTAMP ELSE STARTED_AT END,
-                        COMPLETED_AT = CASE WHEN ? = 'COMPLETADA'
+                        COMPLETED_AT = CASE WHEN ? = 1
                                             THEN CURRENT_TIMESTAMP ELSE COMPLETED_AT END,
                         UPDATED_AT = CURRENT_TIMESTAMP
                   WHERE ID = ?",
-                (new, new, new, &id),
+                (new, &started_flag, &completed_flag, &id),
             )
             .map_err(AppError::from)?;
 
@@ -507,6 +611,61 @@ pub fn update(
             //    llega aquí desde PROGRAMADA/EN_CURSO).
             if new == "COMPLETADA" {
                 consume_inventory(conn, id, &current.code)?;
+            }
+
+            status_audit = Some(format!(
+                "Estado: {} → {}{}",
+                current.status,
+                new,
+                if new == "COMPLETADA" { " (inventario consumido)" } else { "" }
+            ));
+        }
+
+        // 5) Bitácora: prioriza el cambio de estado; si no hubo, registra la
+        //    edición de campos. Misma transacción (rollback = sin registro).
+        {
+            let edit_fields: Vec<&str> = [
+                input.procedure_type.as_deref(),
+                input.body_region.as_deref(),
+                input.laterality.as_deref(),
+                input.description.as_deref(),
+                input.presumptive_diagnosis.as_deref().map(|_| "diagnóstico presuntivo"),
+                input.definitive_diagnosis.as_deref().map(|_| "diagnóstico definitivo"),
+                input.scheduled_at.as_deref(),
+                input.duration_min.map(|_| "duración"),
+                input.anesthesia_type.as_deref(),
+                input.asa_risk.map(|_| "ASA"),
+                input.estimated_cost.map(|_| "costo"),
+                input.vet_id.map(|_| "veterinario"),
+                if input.materials.is_some() { Some("materiales") } else { None },
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+
+            if let Some(sa) = &status_audit {
+                crate::repositories::audit::log(
+                    conn,
+                    actor,
+                    "CIRUGIA",
+                    Some(id),
+                    Some(&current.code),
+                    "ESTADO",
+                    Some(match edit_fields.is_empty() {
+                        true => sa.clone(),
+                        false => format!("{sa} · también editó: {}", edit_fields.join(", ")),
+                    }),
+                )?;
+            } else if !edit_fields.is_empty() {
+                crate::repositories::audit::log(
+                    conn,
+                    actor,
+                    "CIRUGIA",
+                    Some(id),
+                    Some(&current.code),
+                    "EDITAR",
+                    Some(format!("Editó: {}", edit_fields.join(", "))),
+                )?;
             }
         }
 

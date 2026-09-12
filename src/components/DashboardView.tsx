@@ -313,6 +313,51 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             )}
           </div>
         </div>
+
+        {/* ---------- Documentos impresos ---------- */}
+        <div className="card">
+          <div className="card-head">
+            <h2>Documentos impresos</h2>
+            <span className="card-sub">últimos 30 días · por tipo</span>
+            <span className="spacer" />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => onNavigate?.("audit")}
+              title="Ver la bitácora completa de impresiones"
+            >
+              Ver bitácora
+            </button>
+          </div>
+          <div className="card-body">
+            {data.documentPrints.length === 0 ? (
+              <p className="muted">
+                Sin impresiones registradas: cada documento confirmado desde la vista
+                previa queda anotado aquí y en la bitácora.
+              </p>
+            ) : (
+              <div className="bars">
+                {data.documentPrints.map((d) => {
+                  const max = Math.max(...data.documentPrints.map((x) => x.count), 1);
+                  return (
+                    <div key={d.document} className="bar-row">
+                      <span className="bar-month" style={{ maxWidth: "38%" }} title={d.document}>
+                        {d.document}
+                      </span>
+                      <span className="bar-track">
+                        <span
+                          className="bar-fill"
+                          style={{ width: `${Math.round((d.count / max) * 100)}%` }}
+                        />
+                      </span>
+                      <span className="bar-count">{d.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

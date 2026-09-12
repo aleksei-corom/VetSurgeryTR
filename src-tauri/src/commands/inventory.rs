@@ -11,12 +11,13 @@ use crate::state::AppState;
 /// Inventario ortopédico con búsqueda (nombre/código/subtipo/talla/proveedor),
 /// filtro por categoría y de stock bajo (STOCK_QTY <= MIN_STOCK).
 #[tauri::command]
-pub fn list_inventory_items(
+pub async fn list_inventory_items(
     state: State<'_, AppState>,
     search: Option<String>,
     category: Option<String>,
     low_stock: Option<bool>,
 ) -> Result<Vec<InventoryItem>, AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     inventory_repo::list(
         pooled.conn(),
@@ -28,10 +29,11 @@ pub fn list_inventory_items(
 
 /// Detalle de un ítem con su historial de movimientos (máx. 50).
 #[tauri::command]
-pub fn get_inventory_item(
+pub async fn get_inventory_item(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<Option<InventoryItemDetail>, AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     inventory_repo::get_detail(pooled.conn(), id)
 }
@@ -39,7 +41,7 @@ pub fn get_inventory_item(
 /// Crea un ítem (código INV-NNNN). Si stockQty > 0 registra la ENTRADA
 /// inicial para que existencias y movimientos cuadren.
 #[tauri::command]
-pub fn create_inventory_item(
+pub async fn create_inventory_item(
     state: State<'_, AppState>,
     input: CreateInventoryItemInput,
 ) -> Result<InventoryItem, AppError> {
@@ -69,13 +71,14 @@ pub fn create_inventory_item(
         validate_date(expires)?;
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     inventory_repo::create(pooled.conn(), &input)
 }
 
 /// Actualización parcial del ítem (el stock solo cambia por movimientos).
 #[tauri::command]
-pub fn update_inventory_item(
+pub async fn update_inventory_item(
     state: State<'_, AppState>,
     id: i32,
     input: UpdateInventoryItemInput,
@@ -100,6 +103,7 @@ pub fn update_inventory_item(
         validate_date(expires)?;
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     inventory_repo::update(pooled.conn(), id, &input)
 }

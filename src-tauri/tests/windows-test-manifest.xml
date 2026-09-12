@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Manifiesto para los binarios de test (tests/*.rs): idéntico al default
+     de tauri-build. Los tests de integración no pasan por tauri_build::build()
+     y sin la dependencia de Common-Controls v6 el enlazador deja comctl32 sin
+     resolver (STATUS_ENTRYPOINT_NOT_FOUND / error 14001 de SxS). -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>

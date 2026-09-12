@@ -27,6 +27,18 @@ pub struct CreateVetInput {
     pub email: Option<String>,
 }
 
+/// Edición de un veterinario (solo admins). Campos None = dejar sin cambio;
+/// strings vacíos se interpretan como «quitar el dato» (NULL).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateVetInput {
+    pub full_name: Option<String>,
+    pub license: Option<String>,
+    pub specialty: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+}
+
 /// Veterinario resumido dentro de una cirugía.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -47,6 +47,19 @@ impl DbPool {
             }
         }
     }
+
+    /// Devuelve una conexión al pool SIN el tope de tamaño (usada por el
+    /// respaldo para reintegrar las conexiones extraídas durante el quiesce).
+    pub fn release_raw(&self, conn: SimpleConnection) {
+        if let Ok(mut q) = self.0.lock() {
+            q.push_back(conn);
+        }
+    }
+
+    /// Conexiones actualmente dentro del pool (diagnóstico / pruebas).
+    pub fn idle_count(&self) -> usize {
+        self.0.lock().map(|q| q.len()).unwrap_or(0)
+    }
 }
 
 /// Guard que devuelve la conexión al pool al soltarse.
@@ -58,6 +71,12 @@ pub struct PooledConn {
 impl PooledConn {
     pub fn conn(&mut self) -> &mut SimpleConnection {
         self.conn.as_mut().expect("conexión ya liberada")
+    }
+
+    /// Extrae la conexión cruda SIN devolverla al pool al soltarse (la usa
+    /// el respaldo para vaciar el pool durante la copia del archivo).
+    pub fn into_inner(mut self) -> SimpleConnection {
+        self.conn.take().expect("conexión ya liberada")
     }
 }
 
@@ -191,6 +210,10 @@ pub fn bootstrap(db_path: &Path, fbclient: &Path) -> Result<(DbPool, i32), AppEr
     };
 
     let schema_version = migrations::run_migrations(&mut first)?;
+
+    // Primer arranque tras la migración 0005: crea el usuario admin inicial
+    // (hash Argon2id de sal aleatoria) si la tabla está vacía.
+    crate::repositories::user::ensure_default_admin(&mut first)?;
 
     let pool = DbPool(Arc::new(Mutex::new(VecDeque::new())));
     pool.release(first);

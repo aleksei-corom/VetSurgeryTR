@@ -47,6 +47,23 @@ export function fmtQty(v: number | null | undefined): string {
   return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
 }
 
+/** Bytes → "1.2 MB" / "845 kB" / "512 B" (binario, es-CO). */
+export function fmtBytes(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (v < 1024) return `${v} B`;
+  const units = ["kB", "MB", "GB", "TB"];
+  let value = v;
+  let unit = "B";
+  for (const u of units) {
+    if (value < 1024) {
+      unit = u;
+      break;
+    }
+    value /= 1024;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0).replace(".", ",")} ${unit}`;
+}
+
 /** Edad en meses → "4 a 2 m" / "7 m" / "—" */
 export function fmtAge(months: number | null | undefined): string {
   if (months == null) return "—";

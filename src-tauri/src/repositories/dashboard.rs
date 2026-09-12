@@ -4,7 +4,9 @@ use rsfbclient::SimpleConnection;
 use chrono::Datelike;
 
 use crate::error::AppError;
-use crate::models::dashboard::{CategoryCount, DashboardData, DashboardStats, MonthCount};
+use crate::models::dashboard::{
+    CategoryCount, DashboardData, DashboardStats, DocumentPrintCount, MonthCount,
+};
 use crate::repositories::{inventory as inventory_repo, surgery as surgery_repo};
 
 fn count(conn: &mut SimpleConnection, sql: &str) -> Result<i32, AppError> {
@@ -134,6 +136,27 @@ pub fn get_dashboard(conn: &mut SimpleConnection) -> Result<DashboardData, AppEr
         })
         .collect();
 
+    // ---- Documentos impresos (últimos 30 días), por tipo ----
+    // La bitácora guarda «Documento impreso: <tipo>» en DETAIL; se agrupa por
+    // ese sufijo para obtener el conteo por tipo de documento. Se filtra por
+    // entidad DOCUMENTO + acción IMPRIMIR para no mezclar otros eventos.
+    let print_rows: Vec<(String, i32)> = conn
+        .query(
+            "SELECT REPLACE(a.DETAIL, 'Documento impreso: ', ''), CAST(COUNT(*) AS INTEGER)
+             FROM AUDIT_LOG a
+             WHERE a.ENTITY_TYPE = 'DOCUMENTO'
+               AND a.ACTION = 'IMPRIMIR'
+               AND a.CREATED_AT >= DATEADD(-30 DAY TO CAST(CURRENT_DATE AS TIMESTAMP))
+             GROUP BY 1
+             ORDER BY 2 DESC",
+            (),
+        )
+        .map_err(AppError::from)?;
+    let document_prints = print_rows
+        .into_iter()
+        .map(|(document, count)| DocumentPrintCount { document, count })
+        .collect();
+
     Ok(DashboardData {
         stats: DashboardStats {
             patients_active,
@@ -149,5 +172,6 @@ pub fn get_dashboard(conn: &mut SimpleConnection) -> Result<DashboardData, AppEr
         follow_ups_due_list,
         monthly_surgeries,
         category_distribution,
+        document_prints,
     })
 }

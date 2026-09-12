@@ -4,12 +4,15 @@
 // serializa AppError como { type, data }— a Errores con mensaje en español.
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AuditEntry,
+  ClinicSettings,
   CreateFollowUpInput,
   CreateInventoryItemInput,
   CreateMovementInput,
   CreateOwnerInput,
   CreatePatientInput,
   CreateSurgeryInput,
+  DocumentPrintCount,
   CreateVetInput,
   DashboardData,
   DbStatus,
@@ -28,7 +31,12 @@ import type {
   UpdateInventoryItemInput,
   UpdatePatientInput,
   UpdateSurgeryInput,
+  UpdateUserInput,
+  UpdateVetInput,
+  UpdateClinicSettingsInput,
+  Session,
   UpsertMaterialInput,
+  User,
   Vet,
 } from "@/types";
 
@@ -63,6 +71,148 @@ export function getDashboard(): Promise<DashboardData> {
   return call("get_dashboard");
 }
 
+// ================================ Respaldos =================================
+
+export interface BackupFile {
+  fileName: string;
+  fullPath: string;
+  sizeBytes: number;
+  modifiedAt: string;
+  schemaVersion: number;
+}
+
+export interface CreateBackupResult {
+  backup: BackupFile;
+  totalBackups: number;
+}
+
+/** Crea un respaldo puntual (copia del .fdb en reposo) y lo devuelve. */
+export function createBackup(): Promise<CreateBackupResult> {
+  return call("create_backup");
+}
+
+/** Respaldos existentes, más recientes primero (máx. 100). */
+export function listBackups(): Promise<BackupFile[]> {
+  return call("list_backups");
+}
+
+// ===================== Configuración de la clínica ==========================
+
+export function getClinicSettings(): Promise<ClinicSettings> {
+  return call("get_clinic_settings");
+}
+
+export function updateClinicSettings(
+  input: UpdateClinicSettingsInput,
+): Promise<ClinicSettings> {
+  return call("update_clinic_settings", { input });
+}
+
+// ============================ Exportaciones CSV ==============================
+
+/**
+ * Abre el selector nativo de carpetas y devuelve la ruta elegida
+ * (null si el usuario cancela). Requiere tauri-plugin-dialog.
+ */
+async function pickFolder(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const dir = await open({ directory: true, title: "Carpeta donde guardar el CSV" });
+  return typeof dir === "string" ? dir : null;
+}
+
+/**
+ * Exporta el inventario completo a CSV (separador ";", BOM UTF-8, apto para
+ * doble clic en Excel es-CO). Devuelve la ruta del archivo generado o null
+ * si el usuario canceló el selector de carpeta.
+ */
+export async function exportInventoryCsv(): Promise<string | null> {
+  const dir = await pickFolder();
+  if (!dir) return null;
+  return call("export_inventory_csv", { dir });
+}
+
+/** Igual que exportInventoryCsv pero para el kardex global (hasta 5.000). */
+export async function exportKardexCsv(): Promise<string | null> {
+  const dir = await pickFolder();
+  if (!dir) return null;
+  return call("export_kardex_csv", { dir });
+}
+
+/** Igual que las anteriores pero para la bitácora de auditoría completa
+ *  (hasta 5.000 entradas, incluidas las impresiones de documentos). */
+export async function exportAuditCsv(): Promise<string | null> {
+  const dir = await pickFolder();
+  if (!dir) return null;
+  return call("export_audit_csv", { dir });
+}
+
+// ========================== Bitácora de auditoría ===========================
+
+export interface AuditListParams {
+  entityType?: string;
+  action?: string;
+  search?: string;
+  /** Default 200, tope 1000 (validado en el backend). */
+  limit?: number;
+}
+
+/** Bitácora de auditoría (más recientes primero). */
+export function listAuditLog(params: AuditListParams = {}): Promise<AuditEntry[]> {
+  return call("list_audit_log", {
+    entityType: params.entityType ?? null,
+    action: params.action ?? null,
+    search: params.search ?? null,
+    limit: params.limit ?? null,
+  });
+}
+
+/** Registra en la bitácora la impresión de un documento clínico
+ *  (entidad DOCUMENTO, acción IMPRIMIR) a nombre del usuario en sesión. */
+export function logDocumentPrint(input: {
+  document: string;
+  entityCode: string;
+  entityId?: number | null;
+}): Promise<void> {
+  return call("log_document_print", {
+    input: {
+      document: input.document,
+      entityCode: input.entityCode,
+      entityId: input.entityId ?? null,
+    },
+  });
+}
+
+/** Impresiones por tipo de documento de una entidad (CIR-…/PAC-…):
+ *  conteo y fecha de la última — alimenta la fila de impresiones del
+ *  detalle de cirugía. */
+export function getDocumentPrints(entityCode: string): Promise<DocumentPrintCount[]> {
+  return call("get_document_prints", { entityCode });
+}
+
+// ============================ Sesión local (login) ==========================
+
+/** Inicia sesión local. La sesión vive en memoria del backend. */
+export function login(username: string, password: string): Promise<Session> {
+  return call("login", { input: { username, password } });
+}
+
+/** Usuario de la sesión actual (o null si nadie ha entrado aún). */
+export function getSession(): Promise<Session | null> {
+  return call("get_session");
+}
+
+/** Cierra la sesión (vuelve a la pantalla de login). */
+export function logout(): Promise<void> {
+  return call("logout");
+}
+
+/** Cambia la contraseña del usuario autenticado (verifica la actual). */
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return call("change_password", {
+    input: { currentPassword, newPassword },
+  });
+}
+
 // ================================ Propietarios ==============================
 
 export function listOwners(search?: string): Promise<Owner[]> {
@@ -79,8 +229,53 @@ export function listVets(): Promise<Vet[]> {
   return call("list_vets");
 }
 
+/** Todos los veterinarios, incluidos inactivos (gestión de admins). */
+export function listAllVets(): Promise<Vet[]> {
+  return call("list_all_vets");
+}
+
 export function createVet(input: CreateVetInput): Promise<Vet> {
   return call("create_vet", { input });
+}
+
+/** Edita los datos de un veterinario (solo admins). `undefined` = no tocar;
+ *  string vacío = quitar el dato. */
+export function updateVet(vetId: number, input: UpdateVetInput): Promise<Vet> {
+  return call("update_vet", { vetId, input });
+}
+
+/** Activa/desactiva un veterinario (soft-delete con historial intacto). */
+export function setVetActive(vetId: number, active: boolean): Promise<Vet> {
+  return call("set_vet_active", { vetId, active });
+}
+
+// ============================ Usuarios (solo admin) =========================
+
+export function listUsers(): Promise<User[]> {
+  return call("list_users");
+}
+
+export function createUser(input: {
+  username: string;
+  displayName: string;
+  password: string;
+  role: "ADMIN" | "VET";
+}): Promise<User> {
+  return call("create_user", { input });
+}
+
+export function setUserActive(userId: number, active: boolean): Promise<User> {
+  return call("set_user_active", { userId, active });
+}
+
+/** Edita nombre visible y/o rol de un usuario (solo admins). */
+export function updateUser(userId: number, input: UpdateUserInput): Promise<User> {
+  return call("update_user", { userId, input });
+}
+
+/** Restablecimiento por admin (para olvidos): no pide la contraseña actual. */
+export function resetUserPassword(userId: number, newPassword: string): Promise<void> {
+  return call("reset_user_password", { userId, newPassword });
 }
 
 // ================================== Pacientes ===============================
@@ -155,6 +350,25 @@ export function createMovement(
   return call("create_movement", { itemId, input });
 }
 
+export interface MovementListParams {
+  itemId?: number;
+  /** ENTRADA | SALIDA | AJUSTE */
+  type?: string;
+  search?: string;
+  /** Default 100, tope 500 (validado en el backend). */
+  limit?: number;
+}
+
+/** Kardex global de movimientos (más recientes primero). */
+export function listMovements(params: MovementListParams = {}): Promise<InventoryMovement[]> {
+  return call("list_movements", {
+    itemId: params.itemId ?? null,
+    movementType: params.type ?? null,
+    search: params.search ?? null,
+    limit: params.limit ?? null,
+  });
+}
+
 // ================================== Cirugías ================================
 
 export interface SurgeryListParams {
@@ -220,10 +434,12 @@ export function updateFollowUp(
 
 // Re-exportaciones de conveniencia para las vistas.
 export type {
+  AuditEntry,
   CreateFollowUpInput,
   CreateInventoryItemInput,
   CreateMovementInput,
   CreateOwnerInput,
+  DocumentPrintCount,
   CreatePatientInput,
   CreateSurgeryInput,
   CreateVetInput,
@@ -236,6 +452,7 @@ export type {
   MovementResult,
   Patient,
   PatientDetail,
+  Session,
   Surgery,
   SurgeryDetail,
   SurgeryMaterial,
@@ -243,6 +460,10 @@ export type {
   UpdateInventoryItemInput,
   UpdatePatientInput,
   UpdateSurgeryInput,
+  UpdateUserInput,
+  UpdateVetInput,
+  UpdateClinicSettingsInput,
   UpsertMaterialInput,
   Vet,
+  ClinicSettings,
 };

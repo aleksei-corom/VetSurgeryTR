@@ -11,7 +11,7 @@ use crate::state::AppState;
 /// Agenda quirúrgica con filtros por estado, paciente y búsqueda global
 /// (paciente, código, propietario o procedimiento).
 #[tauri::command]
-pub fn list_surgeries(
+pub async fn list_surgeries(
     state: State<'_, AppState>,
     status: Option<String>,
     search: Option<String>,
@@ -20,20 +20,22 @@ pub fn list_surgeries(
     if let Some(s) = status.as_deref() {
         require_in(s, SURGERY_STATUSES, "el estado de cirugía es inválido")?;
     }
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     surgery_repo::list(pooled.conn(), status.as_deref(), search.as_deref(), patient_id)
 }
 
 /// Ficha completa de la cirugía (materiales + controles postoperatorios).
 #[tauri::command]
-pub fn get_surgery(state: State<'_, AppState>, id: i32) -> Result<Option<SurgeryDetail>, AppError> {
+pub async fn get_surgery(state: State<'_, AppState>, id: i32) -> Result<Option<SurgeryDetail>, AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     surgery_repo::get_detail(pooled.conn(), id)
 }
 
 /// Programa una cirugía (código CIR-YYYY-NNNN, estado inicial PROGRAMADA).
 #[tauri::command]
-pub fn create_surgery(
+pub async fn create_surgery(
     state: State<'_, AppState>,
     input: CreateSurgeryInput,
 ) -> Result<SurgeryDetail, AppError> {
@@ -47,8 +49,9 @@ pub fn create_surgery(
         input.estimated_cost,
     )?;
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
-    surgery_repo::create(pooled.conn(), &input)
+    surgery_repo::create(pooled.conn(), &input, &state.actor())
 }
 
 /// Actualización dual (PATCH de la web):
@@ -58,7 +61,7 @@ pub fn create_surgery(
 ///  b) campos editables + sincronización de materials[] (bloqueada si la
 ///     cirugía ya está COMPLETADA).
 #[tauri::command]
-pub fn update_surgery(
+pub async fn update_surgery(
     state: State<'_, AppState>,
     id: i32,
     input: UpdateSurgeryInput,
@@ -96,8 +99,9 @@ pub fn update_surgery(
         }
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
-    surgery_repo::update(pooled.conn(), id, &input)
+    surgery_repo::update(pooled.conn(), id, &input, &state.actor())
 }
 
 /// Validaciones compartidas por create/update.

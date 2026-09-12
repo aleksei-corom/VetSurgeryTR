@@ -22,6 +22,22 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0003_seed",
         include_str!("../../migrations/0003_seed.sql"),
     ),
+    (
+        "0004_audit",
+        include_str!("../../migrations/0004_audit.sql"),
+    ),
+    (
+        "0005_users",
+        include_str!("../../migrations/0005_users.sql"),
+    ),
+    (
+        "0006_diagnosis",
+        include_str!("../../migrations/0006_diagnosis.sql"),
+    ),
+    (
+        "0007_clinic_settings",
+        include_str!("../../migrations/0007_clinic_settings.sql"),
+    ),
 ];
 
 /// Aplica las migraciones pendientes. Devuelve la versión de schema resultante.
@@ -83,9 +99,26 @@ fn ensure_schema_table(conn: &mut SimpleConnection) -> Result<(), AppError> {
     Ok(())
 }
 
+/// ¿El buffer acumulado termina en el terminador de sentencias?
+/// Acepta un comentario de línea pegado después: "…; -- nota".
+fn statement_complete(buf: &str, terminator: &str) -> bool {
+    let t = buf.trim_end();
+    if t.ends_with(terminator) {
+        return true;
+    }
+    if let Some(pos) = t.rfind(terminator) {
+        let after = t[pos + terminator.len()..].trim_start();
+        if after.starts_with("--") {
+            return true;
+        }
+    }
+    false
+}
+
 /// Divide un script SQL en sentencias individuales respetando `SET TERM`
-/// (necesario para crear triggers con ';' internos).
-fn split_statements(sql: &str) -> Result<Vec<String>, AppError> {
+/// (necesario para crear triggers con ';' internos). `pub(crate)`: cubierta
+/// por pruebas unitarias en src/tests.rs.
+pub(crate) fn split_statements(sql: &str) -> Result<Vec<String>, AppError> {
     let mut statements = Vec::new();
     let mut terminator = ";".to_string();
     let mut current = String::new();
@@ -116,13 +149,11 @@ fn split_statements(sql: &str) -> Result<Vec<String>, AppError> {
             current.push_str(raw_line);
         }
 
-        if current.trim_end().ends_with(&terminator) {
-            let stmt = current
-                .trim()
-                .strip_suffix(&terminator)
-                .unwrap_or(current.trim())
-                .trim()
-                .to_string();
+        if statement_complete(&current, &terminator) {
+            // Cortar en el terminador; lo que siga (p. ej. un comentario "--
+            // nota" pegado al ';') se descarta.
+            let pos = current.rfind(&terminator).expect("terminador verificado");
+            let stmt = current[..pos].trim().to_string();
             if !stmt.is_empty() {
                 statements.push(stmt);
             }

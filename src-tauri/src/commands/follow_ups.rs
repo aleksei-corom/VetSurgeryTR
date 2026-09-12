@@ -8,7 +8,7 @@ use crate::state::AppState;
 
 /// Agenda un control postoperatorio (estado inicial PENDIENTE).
 #[tauri::command]
-pub fn create_follow_up(
+pub async fn create_follow_up(
     state: State<'_, AppState>,
     surgery_id: i32,
     input: CreateFollowUpInput,
@@ -20,6 +20,7 @@ pub fn create_follow_up(
         "el tipo de control es inválido",
     )?;
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     follow_up_repo::create(pooled.conn(), surgery_id, &input)
 }
@@ -27,7 +28,7 @@ pub fn create_follow_up(
 /// Cambia el estado de un control (PENDIENTE | CUMPLIDO | PERDIDO). Al pasar
 /// a CUMPLIDO se fija DONE_AT.
 #[tauri::command]
-pub fn update_follow_up(
+pub async fn update_follow_up(
     state: State<'_, AppState>,
     surgery_id: i32,
     follow_up_id: i32,
@@ -39,6 +40,7 @@ pub fn update_follow_up(
         "el estado del control es inválido (PENDIENTE, CUMPLIDO o PERDIDO)",
     )?;
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     follow_up_repo::update(pooled.conn(), surgery_id, follow_up_id, &input)
 }

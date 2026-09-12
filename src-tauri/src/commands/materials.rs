@@ -8,7 +8,7 @@ use crate::state::AppState;
 /// Añade o actualiza un material de la cirugía (upsert sobre cirugía+ítem,
 /// con el costo unitario vigente). Bloqueado si la cirugía está COMPLETADA.
 #[tauri::command]
-pub fn upsert_surgery_material(
+pub async fn upsert_surgery_material(
     state: State<'_, AppState>,
     surgery_id: i32,
     input: UpsertMaterialInput,
@@ -22,17 +22,19 @@ pub fn upsert_surgery_material(
         }
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     surgery_repo::upsert_material(pooled.conn(), surgery_id, &input)
 }
 
 /// Elimina un material de la cirugía. Bloqueado si está COMPLETADA.
 #[tauri::command]
-pub fn remove_surgery_material(
+pub async fn remove_surgery_material(
     state: State<'_, AppState>,
     surgery_id: i32,
     material_id: i32,
 ) -> Result<(), AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     surgery_repo::remove_material(pooled.conn(), surgery_id, material_id)
 }

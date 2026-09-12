@@ -34,6 +34,21 @@ pub struct CategoryCount {
     pub count: i32,
 }
 
+/// Documentos clínicos impresos (últimos 30 días) por tipo: el nombre
+/// legible del documento tal como lo registra la bitácora
+/// (ENTITY_TYPE = DOCUMENTO, ACTION = IMPRIMIR, DETAIL =
+/// «Documento impreso: <tipo>»).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentPrintCount {
+    /// Tipo de documento: «Consentimiento informado», «Fórmula médica
+    /// postquirúrgica», «Historia clínica quirúrgica» o «Historia clínica
+    /// del paciente».
+    pub document: String,
+    /// Impresiones en los últimos 30 días.
+    pub count: i32,
+}
+
 /// Payload completo del dashboard (stats + listas de apoyo).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +64,9 @@ pub struct DashboardData {
     pub monthly_surgeries: Vec<MonthCount>,
     /// Ítems activos agrupados por categoría (orden descendente).
     pub category_distribution: Vec<CategoryCount>,
+    /// Documentos clínicos impresos en los últimos 30 días, por tipo
+    /// (orden descendente). Vacío si nadie ha impreso aún.
+    pub document_prints: Vec<DocumentPrintCount>,
 }
 
 /// Estado del arranque de Firebird (banner de configuración en la UI).

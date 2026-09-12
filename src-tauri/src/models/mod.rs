@@ -1,3 +1,7 @@
+pub mod audit;
+pub mod backup;
+pub mod clinic;
+pub mod user;
 pub mod dashboard;
 pub mod follow_up;
 pub mod inventory;

@@ -1,11 +1,21 @@
-// Cirugías (solo lectura): tabs por estado con contadores + tabla resumen.
-// Datos vía ipc.listSurgeries() (se pide la lista completa y se filtra en UI).
+// Cirugías: tabs por estado con contadores + búsqueda + tabla + acciones:
+// programar (alta), detalle (materiales, estado, controles postoperatorios).
 import { useMemo, useState } from "react";
 import { SURGERY_STATUSES, SURGERY_STATUS_META, type SurgeryStatus } from "@/types";
 import { listSurgeries } from "@/lib/ipc";
 import { fmtDateTime } from "@/lib/format";
 import { useAsync, useDebounced } from "@/lib/use-async";
-import { IconActivity, IconAlert, IconRefresh, IconSearch } from "./icons";
+import { useToast } from "./ui";
+import SurgeryFormDialog from "./SurgeryFormDialog";
+import SurgeryDetailDialog from "./SurgeryDetailDialog";
+import {
+  IconActivity,
+  IconAlert,
+  IconChevronRight,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+} from "./icons";
 
 type Tab = "TODAS" | SurgeryStatus;
 
@@ -25,9 +35,12 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function SurgeriesView() {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("TODAS");
   const [q, setQ] = useState("");
   const debouncedQ = useDebounced(q, 250);
+  const [showForm, setShowForm] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const { data, loading, error, reload } = useAsync(() => listSurgeries({}), []);
 
@@ -91,9 +104,12 @@ export default function SurgeriesView() {
         >
           <IconRefresh size={16} />
         </button>
+        <button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>
+          <IconPlus size={16} /> Programar cirugía
+        </button>
       </div>
 
-      {/* ---------- Tabla resumen ---------- */}
+      {/* ---------- Tabla ---------- */}
       {loading ? (
         <div className="card">
           <div className="loading-row">
@@ -105,11 +121,7 @@ export default function SurgeriesView() {
           <div className="state state-error">
             <IconAlert size={28} />
             <h3>No se pudo cargar las cirugías</h3>
-            <p>
-              {error}
-              <br />
-              Los datos se piden por IPC: ejecuta con <span className="mono">bun run tauri dev</span>.
-            </p>
+            <p>{error}</p>
             <div className="actions">
               <button type="button" className="btn btn-outline" onClick={reload}>
                 <IconRefresh size={16} /> Reintentar
@@ -127,6 +139,11 @@ export default function SurgeriesView() {
                 ? "Aún no hay cirugías registradas."
                 : `No hay cirugías en estado ${SURGERY_STATUS_META[tab as SurgeryStatus]?.label ?? tab}.`}
             </p>
+            <div className="actions">
+              <button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>
+                <IconPlus size={16} /> Programar la primera cirugía
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -141,20 +158,36 @@ export default function SurgeriesView() {
                 <th>Veterinario</th>
                 <th>Fecha programada</th>
                 <th>Estado</th>
+                <th className="num">Materiales</th>
+                <th aria-label="Abrir" />
               </tr>
             </thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.id}>
-                  <td className="mono">{s.code}</td>
-                  <td>
+                <tr
+                  key={s.id}
+                  className="row-click"
+                  tabIndex={0}
+                  onClick={() => setOpenId(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setOpenId(s.id);
+                    }
+                  }}
+                  aria-label={`Abrir detalle de ${s.code}`}
+                >
+                  <td data-label="Código" className="mono">
+                    {s.code}
+                  </td>
+                  <td data-label="Paciente">
                     <span className="cell-main">{s.patient.name}</span>
                     <div className="cell-sub">
                       {s.patient.code} · {s.patient.species}
                       {s.patient.owner ? ` · ${s.patient.owner.fullName}` : ""}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Procedimiento">
                     <span className="cell-main">{s.procedureType}</span>
                     {(s.bodyRegion || s.laterality) && (
                       <div className="cell-sub">
@@ -162,10 +195,21 @@ export default function SurgeriesView() {
                       </div>
                     )}
                   </td>
-                  <td>{s.vet ? s.vet.fullName : <span className="muted">—</span>}</td>
-                  <td>{fmtDateTime(s.scheduledAt)}</td>
-                  <td>
+                  <td data-label="Veterinario">
+                    {s.vet ? s.vet.fullName : <span className="muted">—</span>}
+                  </td>
+                  <td data-label="Fecha programada">{fmtDateTime(s.scheduledAt)}</td>
+                  <td data-label="Estado">
                     <StatusBadge status={s.status} />
+                  </td>
+                  <td data-label="Materiales" className="num">
+                    {s.materialsCount}
+                    {s.materialsCost > 0 ? (
+                      <div className="cell-sub">{Math.round(s.materialsCost).toLocaleString("es-CO")}</div>
+                    ) : null}
+                  </td>
+                  <td data-label="" className="num">
+                    <IconChevronRight size={15} />
                   </td>
                 </tr>
               ))}
@@ -175,8 +219,28 @@ export default function SurgeriesView() {
       )}
 
       <p className="muted mt-2" style={{ fontSize: 12.5 }}>
-        {rows.length} de {data?.length ?? 0} cirugía(s) · vista de solo lectura del kit
+        {rows.length} de {data?.length ?? 0} cirugía(s) · haz clic en una fila para gestionarla
       </p>
+
+      {/* ---------- Diálogos ---------- */}
+      {showForm ? (
+        <SurgeryFormDialog
+          onClose={() => setShowForm(false)}
+          onCreated={(created) => {
+            setShowForm(false);
+            toast.success(`Cirugía ${created.code} programada.`);
+            reload();
+          }}
+        />
+      ) : null}
+
+      {openId != null ? (
+        <SurgeryDetailDialog
+          surgeryId={openId}
+          onClose={() => setOpenId(null)}
+          onChanged={reload}
+        />
+      ) : null}
     </div>
   );
 }

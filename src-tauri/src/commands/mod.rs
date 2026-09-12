@@ -1,4 +1,9 @@
+pub mod audit;
+pub mod auth;
+pub mod backup;
+pub mod clinic;
 pub mod dashboard;
+pub mod export;
 pub mod db;
 pub mod follow_ups;
 pub mod inventory;
@@ -10,6 +15,21 @@ pub mod surgeries;
 pub mod vets;
 
 use crate::error::AppError;
+
+// ============================ GESTIÓN (ADMIN) ===============================
+
+/// Puerta de administración reutilizable: sesión activa con rol ADMIN.
+/// Los comandos de gestión (usuarios/veterinarios) la comparten; pública
+/// porque `vets.rs` vive en otro módulo.
+pub fn require_admin_pub(state: &crate::state::AppState) -> Result<crate::models::user::Session, AppError> {
+    let session = state.require_session()?;
+    if session.user.role != "ADMIN" {
+        return Err(AppError::Validation(
+            "Solo los administradores pueden gestionar usuarios y veterinarios".into(),
+        ));
+    }
+    Ok(session)
+}
 
 // ============================ CATÁLOGOS =====================================
 // Idénticos a src/types.ts (frontend) y a la app web.

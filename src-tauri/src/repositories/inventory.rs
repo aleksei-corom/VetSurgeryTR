@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::models::inventory::{
     CreateInventoryItemInput, InventoryItem, InventoryItemDetail, UpdateInventoryItemInput,
 };
-use crate::repositories::{movement as movement_repo, next_id, with_tx};
+use crate::repositories::{movement as movement_repo, with_tx};
 
 /// Columnas de un ítem del inventario ortopédico.
 const ITEM_SELECT: &str = "

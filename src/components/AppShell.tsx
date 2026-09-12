@@ -1,15 +1,21 @@
 // VetSurgeryTR — Shell de la aplicación: sidebar 240px en escritorio, barra de
 // navegación inferior en pantallas <1024px y header con marca + fecha es-CO.
-import type { ReactNode } from "react";
-import { IconBox, IconPaw, IconPanel, IconActivity } from "./icons";
+// Incluye el toggle de tema claro/oscuro persistente.
+import { useState, type ReactNode } from "react";
+import { getStoredTheme, toggleTheme, type Theme } from "@/lib/theme";
+import { IconBox, IconMoon, IconPaw, IconPanel, IconActivity, IconSave, IconSun, IconHistory, IconShield } from "./icons";
+import UserChip from "./UserChip";
+import type { Session } from "@/types";
 
-export type ViewId = "dashboard" | "patients" | "surgeries" | "inventory";
+export type ViewId = "dashboard" | "patients" | "surgeries" | "inventory" | "audit" | "admin";
 
 export interface NavItem {
   id: ViewId;
   label: string;
   title: string;
   icon: ReactNode;
+  /** Solo visible/habilitado para sesiones con rol ADMIN. */
+  adminOnly?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -37,11 +43,29 @@ export const NAV_ITEMS: NavItem[] = [
     title: "Inventario ortopédico",
     icon: <IconBox size={20} />,
   },
+  {
+    id: "audit",
+    label: "Bitácora",
+    title: "Bitácora de auditoría",
+    icon: <IconHistory size={20} />,
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    title: "Administración (veterinarios y usuarios)",
+    icon: <IconShield size={20} />,
+    adminOnly: true,
+  },
 ];
 
 interface AppShellProps {
   active: ViewId;
   onNavigate: (view: ViewId) => void;
+  onOpenBackups?: () => void;
+  /** Sesión local activa: muestra el chip de usuario en la cabecera. */
+  session: Session;
+  onLoggedOut: () => void;
+  onPasswordChanged?: () => void;
   children: ReactNode;
 }
 
@@ -56,9 +80,24 @@ function fmtToday(): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function AppShell({ active, onNavigate, children }: AppShellProps) {
+export function AppShell({
+  active,
+  onNavigate,
+  onOpenBackups,
+  session,
+  onLoggedOut,
+  onPasswordChanged,
+  children,
+}: AppShellProps) {
   const current = NAV_ITEMS.find((n) => n.id === active);
   const today = fmtToday();
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
+  // Vista Admin: solo para roles ADMIN (el resto ni la ve en el menú).
+  const visibleNav = NAV_ITEMS.filter((n) => !n.adminOnly || session.user.role === "ADMIN");
+
+  function flipTheme() {
+    setThemeState(toggleTheme(theme));
+  }
 
   return (
     <div className="app">
@@ -72,7 +111,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
           </div>
         </div>
         <nav className="side-nav" aria-label="Navegación principal">
-          {NAV_ITEMS.map((item) => (
+          {visibleNav.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -100,6 +139,29 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
             <span className="header-brand-name">VetSurgeryTR</span>
           </div>
           <h1 className="header-title">{current?.title ?? "VetSurgeryTR"}</h1>
+          <button
+            type="button"
+            className="icon-btn theme-toggle"
+            onClick={flipTheme}
+            aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+            title={theme === "dark" ? "Tema claro" : "Tema oscuro"}
+          >
+            {theme === "dark" ? <IconSun size={17} /> : <IconMoon size={17} />}
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onOpenBackups}
+            aria-label="Respaldos de la base de datos"
+            title="Respaldos de la base de datos"
+          >
+            <IconSave size={17} />
+          </button>
+          <UserChip
+            session={session}
+            onLoggedOut={onLoggedOut}
+            onPasswordChanged={onPasswordChanged}
+          />
           <span className="header-date">{today}</span>
         </header>
         <main className="content">{children}</main>
@@ -107,7 +169,7 @@ export function AppShell({ active, onNavigate, children }: AppShellProps) {
 
       {/* ---------- Barra inferior (móvil) ---------- */}
       <nav className="bottom-nav" aria-label="Navegación principal">
-        {NAV_ITEMS.map((item) => (
+        {visibleNav.map((item) => (
           <button
             key={item.id}
             type="button"

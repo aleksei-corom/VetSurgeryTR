@@ -1,3 +1,5 @@
+pub mod audit;
+pub mod clinic;
 pub mod dashboard;
 pub mod follow_up;
 pub mod inventory;
@@ -5,6 +7,7 @@ pub mod movement;
 pub mod owner;
 pub mod patient;
 pub mod surgery;
+pub mod user;
 pub mod vet;
 
 use rsfbclient::prelude::*;
@@ -32,27 +35,4 @@ pub fn fmt_qty(v: f64) -> String {
     }
 }
 
-/// Inicia una transacción explícita y ejecuta la lógica. Si la lógica falla
-/// se hace ROLLBACK (nada queda a medias); si éxito, COMMIT.
-///
-/// `SimpleConnection` confirma automáticamente cada sentencia salvo que se
-/// abra una transacción con `begin_transaction` (ver src/connection/mod.rs
-/// de rsfbclient); así los flujos multi-sentencia (crear paciente con
-/// propietario, consumo de inventario al completar cirugía...) son atómicos.
-pub fn with_tx<T>(
-    conn: &mut SimpleConnection,
-    logic: impl FnOnce(&mut SimpleConnection) -> Result<T, AppError>,
-) -> Result<T, AppError> {
-    conn.begin_transaction().map_err(AppError::from)?;
-    match logic(conn) {
-        Ok(v) => {
-            conn.commit().map_err(AppError::from)?;
-            Ok(v)
-        }
-        Err(e) => {
-            // El rollback es best-effort: el error original manda.
-            conn.rollback().ok();
-            Err(e)
-        }
-    }
-}
+pub use crate::db::with_tx;

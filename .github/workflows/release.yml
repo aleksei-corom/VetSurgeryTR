@@ -1,0 +1,69 @@
+# VetSurgeryTR · Release
+#
+# Se dispara al pushear un tag v* (p. ej. v1.0.1). Compila el instalador
+# NSIS de Windows con tauri-action —que a su vez ejecuta el build del
+# frontend (beforeBuildCommand: bun run build) y el backend Rust en modo
+# release— y crea la release de GitHub adjuntando el instalador.
+#
+# Convención: el tag DEBE coincidir con "version" de src-tauri/tauri.conf.json
+# (tag v1.2.3 ↔ "version": "1.2.3"); el paso de verificación corta el job con
+# un error claro si no cuadran, antes de compilar 10+ minutos en vano.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # crear la release y subir el instalador
+
+jobs:
+  build-windows-installer:
+    name: Windows NSIS installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches tauri.conf.json version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CONF=$(node -e "console.log(require('./src-tauri/tauri.conf.json').version)")
+          echo "tag: v$TAG · tauri.conf.json: $CONF"
+          if [ "$TAG" != "$CONF" ]; then
+            echo "::error::El tag v$TAG no coincide con la versión $CONF de src-tauri/tauri.conf.json. Ajusta el tag o la versión y vuelve a etiquetar."
+            exit 1
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # El smoke test E2E contra Firebird real no corre aquí: el binario
+      # release ya se valida al empaquetar (el CI lo cubre en cada push).
+      - name: Build NSIS installer + create GitHub release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "VetSurgeryTR ${{ github.ref_name }}"
+          releaseBody: >-
+            Instalador NSIS de Windows (instalación por usuario, sin
+            privilegios de administrador). Incluye Firebird 5 Embedded:
+            no requiere instalación ni configuración adicional — la base de
+            datos se crea en el primer arranque en %APPDATA%.
+          releaseDraft: false
+          prerelease: false
+          args: --config src-tauri/tauri.conf.json

@@ -1,0 +1,92 @@
+# VetSurgeryTR · CI
+#
+# 1) Frontend: typecheck (tsc --noEmit) + build de producción con Bun.
+# 2) Rust: cargo check + clippy (-D warnings) + pruebas unitarias (no
+#    requieren Firebird) en Linux y Windows, en paralelo con el trabajo de
+#    frontend. El trabajo de Windows ejecuta además el smoke test E2E
+#    contra Firebird 5 Embedded REAL: la librería completa (fbclient.dll +
+#    ICU + plugins) está versionada en src-tauri/binaries/firebird/.
+#
+# Nota: frontendDist (../dist) está gitignoreado pero tauri-build NO lo
+# exige para `cargo check`/`cargo test` (verificado), así que los dos
+# trabajos corren en paralelo sin compartir artefactos.
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend · typecheck + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (tsc --noEmit)
+        run: bunx tsc --noEmit
+
+      - name: Production build (tsc && vite build)
+        run: bun run build
+
+  rust:
+    name: Rust · ${{ matrix.os == 'windows-latest' && 'tests + Firebird smoke' || 'check + tests' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Prerequisitos de Tauri v2 en Linux: el build script de wry sondea
+      # webkit2gtk con pkg-config y falla sin las cabeceras de desarrollo.
+      - name: Install Tauri Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libxdo-dev libssl-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check
+        run: cargo check --locked
+
+      # Lints con nivel de error: cualquier warning nuevo rompe el build.
+      - name: clippy (deny warnings)
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      # Pruebas unitarias puras: aritmética de movimientos, transiciones de
+      # estado, validadores, CSV y separador SQL. No necesitan Firebird.
+      - name: Unit tests (cargo test)
+        run: cargo test --locked
+
+      # Smoke test E2E contra Firebird 5 Embedded real (Windows): la pila
+      # completa está committeada en src-tauri/binaries/firebird/. Detectó en
+      # su día el bug de "string right truncation" al completar una cirugía,
+      # así que debe seguir siendo bloqueante.
+      - name: Firebird E2E smoke test (real embedded engine)
+        if: runner.os == 'Windows'
+        run: cargo test --locked --test firebird_smoke -- --ignored --nocapture

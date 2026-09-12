@@ -272,6 +272,10 @@ export interface Surgery {
   bodyRegion: string | null;
   laterality: string | null;
   description: string | null;
+  /** Diagnóstico presuntivo (motivo quirúrgico, migración 0006). */
+  presumptiveDiagnosis: string | null;
+  /** Diagnóstico definitivo (hallazgo confirmado al completar). */
+  definitiveDiagnosis: string | null;
   scheduledAt: string;
   durationMin: number | null;
   anesthesiaType: string | null;
@@ -308,6 +312,80 @@ export interface SurgeryDetail extends Surgery {
   follow_ups: FollowUp[];
 }
 
+// ============================ BITÁCORA (AUDITORÍA) ==========================
+
+export type AuditEntityType = "INVENTARIO" | "CIRUGIA" | "PACIENTE" | "USUARIO" | "DOCUMENTO";
+export type AuditAction =
+  | "ENTRADA"
+  | "SALIDA"
+  | "AJUSTE"
+  | "ESTADO"
+  | "EDITAR"
+  | "CREAR"
+  | "IMPRIMIR";
+
+/** Entrada de la bitácora: quién hizo qué y cuándo. */
+export interface AuditEntry {
+  id: number;
+  entityType: AuditEntityType;
+  entityId: number | null;
+  /** INV-0001 / CIR-2026-0001 / PAC-2026-0001 / admin */
+  entityCode: string | null;
+  action: AuditAction;
+  /** Resumen legible (cambios, cantidades, motivo…). */
+  detail: string | null;
+  actor: string;
+  createdAt: string;
+}
+
+/** Usuario local de la app (sin hash de contraseña, jamás sale del backend). */
+export interface User {
+  id: number;
+  username: string;
+  displayName: string;
+  role: "ADMIN" | "VET";
+  active: boolean;
+}
+
+/** Sesión local en memoria (se pierde al cerrar la app, a propósito). */
+export interface Session {
+  user: User;
+  loggedInAt: string;
+}
+
+/** Identidad de la clínica (fila única): alimenta el encabezado y el pie de
+ *  los documentos imprimibles. Todo menos el nombre es opcional. */
+export interface ClinicSettings {
+  clinicName: string | null;
+  taxId: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  license: string | null;
+  /** Logo como data URL (data:image/…;base64,…) */
+  logoDataUrl: string | null;
+  updatedAt: string | null;
+}
+
+/** Edición de la configuración (solo admins). `undefined` = no tocar;
+ *  cadena vacía = quitar el dato. */
+export interface UpdateClinicSettingsInput {
+  clinicName?: string;
+  taxId?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  license?: string;
+  logoDataUrl?: string;
+}
+
+/** Edición de un usuario por admin. `undefined` = no tocar. El username no
+ *  se editable (es la identidad en la bitácora y en los ingresos). */
+export interface UpdateUserInput {
+  displayName?: string;
+  role?: "ADMIN" | "VET";
+}
+
 // ============================== DASHBOARD ===================================
 
 export interface DashboardData {
@@ -327,6 +405,17 @@ export interface DashboardData {
   })[];
   monthlySurgeries: { month: string; count: number }[];
   categoryDistribution: { category: string; count: number }[];
+  /** Documentos clínicos impresos en los últimos 30 días, por tipo (desc). */
+  documentPrints: { document: string; count: number }[];
+}
+
+/** Impresiones de un documento clínico para una entidad (cirugía/paciente):
+ *  cuántas veces salió y cuándo fue la última. */
+export interface DocumentPrintCount {
+  document: string;
+  count: number;
+  /** YYYY-MM-DD HH:MM:SS de la última impresión, si existe. */
+  lastPrintedAt: string | null;
 }
 
 /** Estado de arranque de Firebird (banner de configuración). */
@@ -409,6 +498,16 @@ export interface CreateVetInput {
   email?: string;
 }
 
+/** Edición parcial de veterinario (solo admins). `undefined` = no tocar;
+ *  string vacío = quitar el dato. */
+export interface UpdateVetInput {
+  fullName?: string;
+  license?: string;
+  specialty?: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface CreateInventoryItemInput {
   name: string;
   category: string;
@@ -462,6 +561,7 @@ export interface CreateSurgeryInput {
   bodyRegion?: string;
   laterality?: string;
   description?: string;
+  presumptiveDiagnosis?: string;
   scheduledAt: string;
   durationMin?: number;
   anesthesiaType?: string;
@@ -484,6 +584,8 @@ export interface UpdateSurgeryInput {
   bodyRegion?: string;
   laterality?: string;
   description?: string;
+  presumptiveDiagnosis?: string;
+  definitiveDiagnosis?: string;
   scheduledAt?: string;
   durationMin?: number;
   anesthesiaType?: string;

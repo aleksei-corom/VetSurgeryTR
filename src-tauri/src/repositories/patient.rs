@@ -116,7 +116,21 @@ pub fn get_detail(conn: &mut SimpleConnection, id: i32) -> Result<Option<Patient
         return Ok(None);
     };
 
-    let rows: Vec<(i32, String, String, String, String, Option<String>, Option<String>, Option<i32>, Option<String>)> = conn
+/// Fila del historial quirúrgico dentro de la ficha del paciente:
+/// (id, código, procedimiento, fecha, estado, región, lateralidad, vet_id, vet_nombre).
+type PatientSurgeryRow = (
+    i32,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<i32>,
+    Option<String>,
+);
+
+let rows: Vec<PatientSurgeryRow> = conn
         .query(
             "SELECT s.ID, s.CODE, s.PROCEDURE_TYPE,
                     LEFT(CAST(s.SCHEDULED_AT AS VARCHAR(60)), 19),
@@ -154,7 +168,11 @@ pub fn get_detail(conn: &mut SimpleConnection, id: i32) -> Result<Option<Patient
 
 /// Crea un paciente (código PAC-YYYY-NNNN por trigger) reutilizando el
 /// propietario por documento. Todo en una transacción.
-pub fn create(conn: &mut SimpleConnection, input: &CreatePatientInput) -> Result<Patient, AppError> {
+pub fn create(
+    conn: &mut SimpleConnection,
+    input: &CreatePatientInput,
+    actor: &str,
+) -> Result<Patient, AppError> {
     with_tx(conn, |conn| {
         // Unicidad de microchip con mensaje amable (la BD también la exige).
         if let Some(chip) = input.microchip.as_deref().filter(|c| !c.trim().is_empty()) {
@@ -195,7 +213,23 @@ pub fn create(conn: &mut SimpleConnection, input: &CreatePatientInput) -> Result
         )
         .map_err(AppError::from)?;
 
-        get(conn, id)?.ok_or_else(|| AppError::Internal("Paciente creado pero no recuperado".into()))
+        // Bitácora: alta de paciente (misma transacción).
+        let created = get(conn, id)?
+            .ok_or_else(|| AppError::Internal("Paciente creado pero no recuperado".into()))?;
+        crate::repositories::audit::log(
+            conn,
+            actor,
+            "PACIENTE",
+            Some(id),
+            Some(&created.code),
+            "CREAR",
+            Some(format!(
+                "Alta de paciente: {} ({}) · propietario {}",
+                created.name, created.species,
+                input.owner.full_name
+            )),
+        )?;
+        Ok(created)
     })
 }
 
@@ -205,9 +239,13 @@ pub fn update(
     conn: &mut SimpleConnection,
     id: i32,
     input: &UpdatePatientInput,
+    actor: &str,
 ) -> Result<Patient, AppError> {
     let current = get(conn, id)?
         .ok_or_else(|| AppError::NotFound(format!("Paciente {id} no encontrado")))?;
+
+    // Diff para la bitácora ANTES de fusionar (solo campos realmente cambiados).
+    let audit_detail = crate::repositories::audit::patient_diff(&current, input);
 
     let name = input.name.clone().unwrap_or(current.name);
     let species = input.species.clone().unwrap_or(current.species);
@@ -234,5 +272,13 @@ pub fn update(
     )
     .map_err(AppError::from)?;
 
-    get(conn, id)?.ok_or_else(|| AppError::Internal("Paciente actualizado pero no recuperado".into()))
+    let updated = get(conn, id)?
+        .ok_or_else(|| AppError::Internal("Paciente actualizado pero no recuperado".into()))?;
+
+    // Auditoría: solo si hubo cambios reales (misma transacción del UPDATE).
+    if let Some(detail) = audit_detail {
+        crate::repositories::audit::log(conn, actor, "PACIENTE", Some(id), Some(&current.code), "EDITAR", Some(detail))?;
+    }
+
+    Ok(updated)
 }

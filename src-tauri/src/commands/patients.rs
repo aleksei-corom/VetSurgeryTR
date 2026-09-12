@@ -9,22 +9,24 @@ use crate::state::AppState;
 /// Listado de pacientes con búsqueda (nombre/código/propietario/microchip),
 /// filtro por especie y por estado activo.
 #[tauri::command]
-pub fn list_patients(
+pub async fn list_patients(
     state: State<'_, AppState>,
     search: Option<String>,
     species: Option<String>,
     active: Option<bool>,
 ) -> Result<Vec<crate::models::patient::Patient>, AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::list(pooled.conn(), search.as_deref(), species.as_deref(), active)
 }
 
 /// Ficha del paciente con su historial quirúrgico.
 #[tauri::command]
-pub fn get_patient(
+pub async fn get_patient(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<Option<PatientDetail>, AppError> {
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
     patient_repo::get_detail(pooled.conn(), id)
 }
@@ -32,7 +34,7 @@ pub fn get_patient(
 /// Crea un paciente (código PAC-YYYY-NNNN). El propietario se reutiliza por
 /// documento único: si existe se actualizan nombre y contactos provistos.
 #[tauri::command]
-pub fn create_patient(
+pub async fn create_patient(
     state: State<'_, AppState>,
     input: CreatePatientInput,
 ) -> Result<crate::models::patient::Patient, AppError> {
@@ -58,13 +60,14 @@ pub fn create_patient(
         validate_date(birth)?;
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
-    patient_repo::create(pooled.conn(), &input)
+    patient_repo::create(pooled.conn(), &input, &state.actor())
 }
 
 /// Actualización parcial de paciente (None = dejar sin cambio).
 #[tauri::command]
-pub fn update_patient(
+pub async fn update_patient(
     state: State<'_, AppState>,
     id: i32,
     input: UpdatePatientInput,
@@ -87,6 +90,7 @@ pub fn update_patient(
         validate_date(birth)?;
     }
 
+    state.require_session()?;
     let mut pooled = state.pool.acquire()?;
-    patient_repo::update(pooled.conn(), id, &input)
+    patient_repo::update(pooled.conn(), id, &input, &state.actor())
 }
