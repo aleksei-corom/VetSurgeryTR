@@ -426,6 +426,9 @@
           { document: "Consentimiento informado", count: 2, lastPrintedAt: "2026-09-11 16:17:00" },
           { document: "Fórmula médica postquirúrgica", count: 1, lastPrintedAt: "2026-09-11 16:18:00" },
         ],
+        "PAC-2026-0001": [
+          { document: "Historia clínica del paciente", count: 3, lastPrintedAt: "2026-09-10 09:12:00" },
+        ],
       };
       return Promise.resolve(demo[(args && args.entityCode) || ""] || []);
     },

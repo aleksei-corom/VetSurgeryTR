@@ -1,10 +1,16 @@
 // Ficha del paciente: datos del propietario, clínicos e historial quirúrgico
-// (get_patient → PatientDetail). Acción: editar.
+// (get_patient → PatientDetail). Acción: editar. Igual que el detalle de
+// cirugía, muestra cuántas veces salió cada documento clínico del paciente
+// (conteo + última fecha, alimentado por el código PAC-…).
+import { useState } from "react";
 import { SURGERY_STATUS_META, type PatientDetail, type SurgeryStatus } from "@/types";
+import { getDocumentPrints } from "@/lib/ipc";
 import { fmtAge, fmtDate, fmtQty, fmtSex } from "@/lib/format";
 import { buildHistoriaPaciente } from "@/lib/clinical-docs";
+import { useAsync } from "@/lib/use-async";
 import { usePrintPreview } from "@/lib/use-print-preview";
 import PrintPreviewDialog from "./PrintPreviewDialog";
+import PrintCountsRow from "./PrintCountsRow";
 import { Modal } from "./ui";
 import { IconDownload, IconEdit } from "./icons";
 
@@ -22,6 +28,15 @@ export default function PatientDetailDialog({ detail, loading, error, onClose, o
   const p = detail;
   const preview = usePrintPreview();
 
+  // Impresiones por documento de ESTE paciente (código PAC-…): se consulta
+  // cuando llega el detalle y se recarga tras cada impresión confirmada.
+  const [printsTick, setPrintsTick] = useState(0);
+  const code = p?.code;
+  const prints = useAsync(
+    () => (code ? getDocumentPrints(code) : Promise.resolve([])),
+    [code, printsTick],
+  );
+
   return (
     <Modal
       title={p ? `${fmtSex(p.sex)} ${p.name}` : "Ficha del paciente"}
@@ -30,19 +45,22 @@ export default function PatientDetailDialog({ detail, loading, error, onClose, o
       width={680}
       footer={
         p ? (
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={!detail}
-              onClick={() => detail && preview.open(() => buildHistoriaPaciente(detail))}
-              title="Vista previa de la historia clínica completa del paciente antes de imprimir"
-            >
-              <IconDownload size={16} /> Historia clínica
-            </button>
-            <button type="button" className="btn btn-primary" onClick={() => onEdit(detail!)}>
-              <IconEdit size={16} /> Editar paciente
-            </button>
+          <div style={{ width: "100%" }}>
+            <PrintCountsRow prints={prints.data} loading={prints.loading} />
+            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={!detail}
+                onClick={() => detail && preview.open(() => buildHistoriaPaciente(detail))}
+                title="Vista previa de la historia clínica completa del paciente antes de imprimir"
+              >
+                <IconDownload size={16} /> Historia clínica
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => onEdit(detail!)}>
+                <IconEdit size={16} /> Editar paciente
+              </button>
+            </div>
           </div>
         ) : null
       }
@@ -148,6 +166,7 @@ export default function PatientDetailDialog({ detail, loading, error, onClose, o
         loading={preview.loading}
         error={preview.error}
         onClose={preview.close}
+        onPrinted={() => setPrintsTick((t) => t + 1)}
       />
     </Modal>
   );

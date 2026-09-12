@@ -21,7 +21,7 @@ import {
   updateSurgery,
   upsertSurgeryMaterial,
 } from "@/lib/ipc";
-import type { DocumentPrintCount } from "@/types";
+import PrintCountsRow from "./PrintCountsRow";
 import { fmtCOP, fmtDate, fmtDateTime, fmtQty } from "@/lib/format";
 import {
   buildConsentimiento,
@@ -39,43 +39,6 @@ interface Props {
   surgeryId: number;
   onClose: () => void;
   onChanged: () => void;
-}
-
-/** Fila de impresiones del pie del detalle: cuántas veces salió cada
- *  documento de esta cirugía y cuándo fue la última. Solo lista los tipos
- *  con impresiones registradas; si no hay ninguna, una nota discreta. */
-function PrintCountsRow({
-  prints,
-  loading,
-}: {
-  prints?: DocumentPrintCount[] | null;
-  loading: boolean;
-}) {
-  if (loading && !prints) {
-    return (
-      <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-        Cargando impresiones…
-      </div>
-    );
-  }
-  if (!prints?.length) return null;
-  return (
-    <div className="row wrap" style={{ gap: 6, marginBottom: 8 }}>
-      <span className="muted" style={{ fontSize: 12, marginRight: 2 }}>
-        Impresiones:
-      </span>
-      {prints.map((p) => (
-        <span
-          key={p.document}
-          className="chip"
-          title={`Última impresión: ${p.lastPrintedAt ?? "—"}`}
-        >
-          {p.document}: <b>{p.count}</b>
-          {p.count === 1 ? " vez" : " veces"}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 function StatusBadge({ status }: { status: string }) {
