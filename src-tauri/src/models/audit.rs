@@ -26,6 +26,17 @@ pub struct AuditEntry {
 /// usuario autenticado (seed/migraciones); el resto siempre trae sesión.
 pub const SYSTEM_ACTOR: &str = "Sistema local";
 
+/// Total de impresiones de documentos para un código de entidad (p. ej.
+/// PAC-2026-0001). Alimenta la columna «Impresiones» de los listados:
+/// una consulta agrupada para toda la página, no una por fila. Solo
+/// aparecen códigos con al menos una impresión registrada.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityPrintTotal {
+    pub entity_code: String,
+    pub count: i32,
+}
+
 /// Impresiones de un documento clínico para una entidad de origen
 /// (cirugía o paciente): cuántas veces salió y cuándo fue la última.
 #[derive(Debug, Clone, Serialize)]

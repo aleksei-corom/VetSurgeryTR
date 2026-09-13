@@ -418,6 +418,14 @@ export interface DocumentPrintCount {
   lastPrintedAt: string | null;
 }
 
+/** Total de impresiones de documentos de una entidad (PAC-…, CIR-…):
+ *  alimenta la columna «Impresiones» de los listados. Solo aparecen
+ *  códigos con al menos una impresión registrada. */
+export interface EntityPrintTotal {
+  entityCode: string;
+  count: number;
+}
+
 /** Estado de arranque de Firebird (banner de configuración). */
 export interface DbStatus {
   ok: boolean;

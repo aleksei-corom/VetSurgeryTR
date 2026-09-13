@@ -307,7 +307,10 @@ cirugía; movimientos `ENTRADA/SALIDA/AJUSTE` con snapshot `stockAfter`.
   bitácora. Se alimenta de la misma fuente que la bitácora (`AUDIT_LOG`, entidad `DOCUMENTO`,
   acción `IMPRIMIR`). En el **detalle de cada cirugía**, una fila «Impresiones:» sobre los
   botones muestra cuántas veces salió cada documento y la fecha de la última (tooltip), y se
-  actualiza al instante tras confirmar una impresión.
+  actualiza al instante tras confirmar una impresión. El **listado de Pacientes** incluye una
+  columna «Impresiones» con el total de documentos impresos por paciente (consulta agrupada
+  `get_print_totals` con prefijo `PAC-`, una sola query para toda la página), y la ficha del
+  paciente muestra el desglose por tipo vía `get_document_prints`.
 - Vista nueva en la navegación (escritorio y barra inferior móvil): **quién hizo qué y cuándo**
   sobre movimientos de inventario (ENTRADA/SALIDA/AJUSTE con cantidades y stock resultante),
   **altas y transiciones de estado de cirugías** (incluido el consumo de inventario al
@@ -393,6 +396,34 @@ Detalles útiles:
 - Es el test que detectó el bug de «string right truncation» al completar una cirugía (tipo
   inferido desde el literal SQL) — por eso se considera bloqueante.
 
+### Smoke tests de UI con Playwright (tema + layout móvil)
+
+`e2e/` automatiza la verificación visual manual sobre la UI real (vite) contra el mock de IPC
+(`scripts/dev-ipc-mock.js`, inyectado con `addInitScript` — la app empaquetada nunca lo ve).
+Dos proyectos: **desktop** (1280×800) y **mobile** (Pixel 5, 393×851 — bajo el breakpoint de
+720px donde las tablas se apilan en tarjetas).
+
+Cubren:
+
+- **Tema**: `data-theme` inicial light, toggle a dark con cambio real de fondo, persistencia en
+  `localStorage` entre recargas, y KPIs con fondo opaco en ambos temas.
+- **Viewport angosto**: el valor KPI «Valor inventario» no parte cifras (`$ 1.500.000` en una
+  línea), etiquetas del gráfico «Documentos impresos» con elipsis (no envueltas), tablas
+  apiladas con `data-label` bajo 720px y **cero scroll horizontal** en las 5 vistas principales.
+- **Funciones recientes**: columna «Impresiones» del listado de Pacientes (orden y total del
+  mock), chip de impresiones en la ficha, pestañas y filtro de estado de Admin, búsqueda de
+  usuarios con estado vacío, Bitácora con filtros + «Exportar CSV», y tarjeta «Documentos
+  impresos» con conteos ordenados desc + «Ver bitácora».
+
+```bash
+bun run test:e2e                     # ambos proyectos (18 pruebas)
+bunx playwright test --project=mobile   # solo móvil
+bunx playwright test --ui            # modo exploratorio
+```
+
+La primera vez hay que descargar el navegador: `bunx playwright install chromium` (en CI se
+hace solo con `--with-deps`). El job de **Frontend** de CI los ejecuta tras el build.
+
 ### CI (GitHub Actions)
 
 `.github/workflows/ci.yml` corre en cada push a `master`/`main` y en cada PR, con trabajos en
@@ -400,7 +431,7 @@ paralelo:
 
 | Trabajo | Runner | Pasos |
 |---|---|---|
-| **Frontend** | ubuntu | `bun install --frozen-lockfile` → `tsc --noEmit` → `bun run build` |
+| **Frontend** | ubuntu | `bun install --frozen-lockfile` → `tsc --noEmit` → `bun run build` → **smoke tests Playwright** (Chromium, desktop + móvil) |
 | **Rust · Linux** | ubuntu | prereqs GTK/webkit de Tauri → `cargo check --locked` → `clippy -D warnings` → `cargo test --locked` |
 | **Rust · Windows** | windows | ídem **+ smoke test E2E contra Firebird Embedded real** (la pila completa está versionada en el repo) |
 

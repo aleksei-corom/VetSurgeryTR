@@ -46,6 +46,15 @@ jobs:
       - name: Production build (tsc && vite build)
         run: bun run build
 
+      # Smoke E2E de UI con Playwright (Chromium headless): tema claro/oscuro,
+      # layout angosto (tablas apiladas, sin scroll horizontal, cifras KPI) y
+      # las funciones recientes (columna Impresiones, filtros admin, bitácora).
+      # Contra el mock de IPC — no requieren Firebird ni el backend Rust.
+      - name: Playwright UI smoke tests
+        run: |
+          bunx playwright install chromium --with-deps
+          bun run test:e2e
+
   rust:
     name: Rust · ${{ matrix.os == 'windows-latest' && 'tests + Firebird smoke' || 'check + tests' }}
     strategy:

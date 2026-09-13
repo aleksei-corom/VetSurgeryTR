@@ -33,3 +33,7 @@ Thumbs.db
 
 .vscode/
 Firebird-5.0.3.1683-0/
+
+# Playwright
+test-results/
+playwright-report/

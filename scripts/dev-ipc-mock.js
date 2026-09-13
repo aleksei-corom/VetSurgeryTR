@@ -420,6 +420,24 @@
 
     // ---- Bitácora ----
     export_audit_csv: () => Promise.resolve("C:/demo/bitacora-demo.csv"),
+    get_clinic_settings: () => Promise.resolve({
+      name: "Clínica Veterinaria Demo",
+      address: "Calle 10 #25-30, Bogotá",
+      phone: "601 555 0123",
+      license: "T.P. 12345 - LM 98765",
+      logoDataUrl: null,
+    }),
+    update_clinic_settings: () => Promise.resolve({
+      name: "Clínica Veterinaria Demo",
+      address: "Calle 10 #25-30, Bogotá",
+      phone: "601 555 0123",
+      license: "T.P. 12345 - LM 98765",
+      logoDataUrl: null,
+    }),
+    get_print_totals: (args) => {
+      const demo = { "PAC-": [{ entityCode: "PAC-2026-0001", count: 3 }] };
+      return Promise.resolve(demo[(args && args.prefix) || ""] || []);
+    },
     get_document_prints: (args) => {
       const demo = {
         "CIR-2026-0003": [

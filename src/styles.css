@@ -373,7 +373,7 @@ h3 {
 /* ---------- KPIs ---------- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 12px;
 }
 
@@ -434,8 +434,16 @@ h3 {
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  /* Los valores (cifras, moneda) no se parten a mitad de número: si el
+     espacio no alcanza, se reduce la fuente en pantallas angostas. */
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+@media (max-width: 560px) {
+  .kpi-value {
+    font-size: 18px;
+  }
 }
 
 .kpi-hint {
@@ -508,6 +516,9 @@ th.num {
   font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
   letter-spacing: -0.01em;
+  /* Códigos (INV-0001, PAC-2026-0001) y rutas: permiten corte en pantallas
+     angostas para no empujar el layout más allá del viewport. */
+  overflow-wrap: anywhere;
 }
 
 /* =============================== Badges =============================== */
@@ -981,6 +992,14 @@ th.num {
   font-weight: 600;
 }
 
+/* Etiquetas largas de documento en la tarjeta «Documentos impresos»:
+   una sola línea con elipsis — el nombre completo queda en el tooltip. */
+.bar-row .bar-month.ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .bar-row .bar-track {
   height: 10px;
   border-radius: 999px;
@@ -1088,6 +1107,13 @@ th.num {
   background: var(--amber-soft);
   color: var(--banner-warn-text);
   font-size: 13px;
+  /* En móvil el texto (ruta larga de la BD incluida) no puede empujar el
+     ancho del documento. */
+  min-width: 0;
+}
+
+.banner > div {
+  min-width: 0;
 }
 
 .banner svg {
@@ -1278,6 +1304,28 @@ th.num {
 
   .header {
     padding: 0 16px;
+    /* El chip de usuario puede encoger (nombre con elipsis) en vez de
+       empujar el header más allá del viewport del teléfono. */
+    min-width: 0;
+  }
+
+  .user-chip-wrap {
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  .user-chip {
+    max-width: 42vw;
+  }
+
+  .user-chip .user-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bottom-nav .nav-indicator {
+    max-width: 100%;
   }
 
   .header-date {
@@ -1371,6 +1419,12 @@ th.num {
 
 @media (max-width: 520px) {
   .header-date {
+    display: none;
+  }
+
+  /* En teléfono el nombre de la marca no cabe junto al chip de usuario:
+     queda el logo (la vista activa ya se ve en la barra inferior). */
+  .header-brand-name {
     display: none;
   }
 
@@ -1746,12 +1800,16 @@ tr.row-click:focus-visible {
     overflow: visible;
   }
 
+  /* Tablas apiladas en tarjetas: sin el min-width del modo tabla
+     (720px/640px), que aquí empujaría todo el documento más allá del
+     viewport del teléfono. */
   .table-wrap table,
   .table-wrap tbody,
   .table-wrap tr,
   .table-wrap td {
     display: block;
     width: 100%;
+    min-width: 0;
   }
 
   .table-wrap thead {
