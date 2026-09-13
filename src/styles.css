@@ -388,6 +388,11 @@ h3 {
   box-shadow: var(--shadow-sm);
   text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  /* Un valor que no pueda reducirse (p. ej. cifra larga con fuente de
+     sistema ancha) no debe derramar texto fuera de la tarjeta: el derrame
+     inline expande el viewport del layout en móvil → scroll horizontal
+     fantasma en toda la vista. */
+  overflow: hidden;
 }
 
 .kpi:hover:not(:disabled) {
@@ -438,12 +443,6 @@ h3 {
      espacio no alcanza, se reduce la fuente en pantallas angostas. */
   overflow-wrap: normal;
   word-break: keep-all;
-}
-
-@media (max-width: 560px) {
-  .kpi-value {
-    font-size: 18px;
-  }
 }
 
 .kpi-hint {
@@ -1346,7 +1345,12 @@ th.num {
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    /* minmax(0, 1fr) y no 1fr: una pista 1fr toma como base el ancho
+       mínimo de contenido de su botón, y si una etiqueta es un pelo más
+       ancha que 1/5 del viewport (fuentes de sistema más grandes, p. ej.
+       DejaVu en Linux), las CINCO pistas crecen y la barra fija congelar
+       el viewport del layout más ancho → scroll horizontal fantasma. */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--surface);
@@ -1365,7 +1369,20 @@ th.num {
     font-size: 10.5px;
     font-weight: 650;
     min-height: 44px;
+    min-width: 0;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* La etiqueta puede encoger (elipsis): si el texto completo midiera más
+     que 1/5 del viewport (fuentes anchas), el mínimo de contenido del
+     botón expandiría el viewport del layout en móvil → scroll horizontal
+     fantasma en todas las vistas. */
+  .bottom-nav .nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bottom-nav button.active {
@@ -1404,8 +1421,12 @@ th.num {
     gap: 10px;
   }
 
+  /* El valor escala con el viewport dentro de un rango legible: una cifra
+     monetaria completa (p. ej. «$ 1.500.000», indivisible con keep-all)
+     cabe en la tarjeta incluso con fuentes anchas (DejaVu en Linux), cuyo
+     derrame expandiría el viewport del layout → scroll horizontal. */
   .kpi-value {
-    font-size: 19px;
+    font-size: clamp(12.5px, 3.6vw, 19px);
   }
 
   .toolbar {

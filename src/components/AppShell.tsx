@@ -179,7 +179,11 @@ export function AppShell({
           >
             <span className="nav-indicator" aria-hidden="true" />
             {item.icon}
-            {item.label}
+            {/* Span explícito: permite elipsis en la etiqueta — sin él, el
+               mínimo de contenido del botón (texto completo) puede superar
+               1/5 del viewport con fuentes anchas y expandir el viewport del
+               layout en móvil (scroll horizontal fantasma). */}
+            <span className="nav-label">{item.label}</span>
           </button>
         ))}
       </nav>

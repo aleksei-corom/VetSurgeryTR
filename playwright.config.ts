@@ -7,7 +7,14 @@
 //
 //   bunx playwright test            # ambos proyectos (desktop + móvil)
 //   bunx playwright test --ui       # exploratorio
+//
+// El puerto se puede cambiar con E2E_PORT (útil si otro proyecto Tauri en la
+// misma máquina también usa el 1420 y su dev server está levantado); CI usa
+// el 1420 por defecto.
 import { defineConfig, devices } from "@playwright/test";
+
+const PORT = Number(process.env.E2E_PORT ?? 1420);
+const BASE = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -19,7 +26,7 @@ export default defineConfig({
   timeout: 30_000,
 
   use: {
-    baseURL: "http://localhost:1420",
+    baseURL: BASE,
     trace: "retain-on-failure",
     // La app consulta prefers-color-scheme como tema inicial; fijamos light
     // para que las aserciones de tema sean deterministas.
@@ -43,8 +50,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "bun run dev",
-    url: "http://localhost:1420",
+    command: `bun run dev -- --port ${PORT} --strictPort`,
+    url: BASE,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
