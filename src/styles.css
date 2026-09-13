@@ -373,7 +373,7 @@ h3 {
 /* ---------- KPIs ---------- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 12px;
 }
 
@@ -388,6 +388,11 @@ h3 {
   box-shadow: var(--shadow-sm);
   text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  /* Un valor que no pueda reducirse (p. ej. cifra larga con fuente de
+     sistema ancha) no debe derramar texto fuera de la tarjeta: el derrame
+     inline expande el viewport del layout en móvil → scroll horizontal
+     fantasma en toda la vista. */
+  overflow: hidden;
 }
 
 .kpi:hover:not(:disabled) {
@@ -434,8 +439,10 @@ h3 {
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  /* Los valores (cifras, moneda) no se parten a mitad de número: si el
+     espacio no alcanza, se reduce la fuente en pantallas angostas. */
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 .kpi-hint {
@@ -508,6 +515,9 @@ th.num {
   font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
   letter-spacing: -0.01em;
+  /* Códigos (INV-0001, PAC-2026-0001) y rutas: permiten corte en pantallas
+     angostas para no empujar el layout más allá del viewport. */
+  overflow-wrap: anywhere;
 }
 
 /* =============================== Badges =============================== */
@@ -981,6 +991,14 @@ th.num {
   font-weight: 600;
 }
 
+/* Etiquetas largas de documento en la tarjeta «Documentos impresos»:
+   una sola línea con elipsis — el nombre completo queda en el tooltip. */
+.bar-row .bar-month.ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .bar-row .bar-track {
   height: 10px;
   border-radius: 999px;
@@ -1088,6 +1106,13 @@ th.num {
   background: var(--amber-soft);
   color: var(--banner-warn-text);
   font-size: 13px;
+  /* En móvil el texto (ruta larga de la BD incluida) no puede empujar el
+     ancho del documento. */
+  min-width: 0;
+}
+
+.banner > div {
+  min-width: 0;
 }
 
 .banner svg {
@@ -1278,6 +1303,28 @@ th.num {
 
   .header {
     padding: 0 16px;
+    /* El chip de usuario puede encoger (nombre con elipsis) en vez de
+       empujar el header más allá del viewport del teléfono. */
+    min-width: 0;
+  }
+
+  .user-chip-wrap {
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  .user-chip {
+    max-width: 42vw;
+  }
+
+  .user-chip .user-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bottom-nav .nav-indicator {
+    max-width: 100%;
   }
 
   .header-date {
@@ -1298,7 +1345,12 @@ th.num {
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    /* minmax(0, 1fr) y no 1fr: una pista 1fr toma como base el ancho
+       mínimo de contenido de su botón, y si una etiqueta es un pelo más
+       ancha que 1/5 del viewport (fuentes de sistema más grandes, p. ej.
+       DejaVu en Linux), las CINCO pistas crecen y la barra fija congelar
+       el viewport del layout más ancho → scroll horizontal fantasma. */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--surface);
@@ -1317,7 +1369,20 @@ th.num {
     font-size: 10.5px;
     font-weight: 650;
     min-height: 44px;
+    min-width: 0;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* La etiqueta puede encoger (elipsis): si el texto completo midiera más
+     que 1/5 del viewport (fuentes anchas), el mínimo de contenido del
+     botón expandiría el viewport del layout en móvil → scroll horizontal
+     fantasma en todas las vistas. */
+  .bottom-nav .nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bottom-nav button.active {
@@ -1356,8 +1421,12 @@ th.num {
     gap: 10px;
   }
 
+  /* El valor escala con el viewport dentro de un rango legible: una cifra
+     monetaria completa (p. ej. «$ 1.500.000», indivisible con keep-all)
+     cabe en la tarjeta incluso con fuentes anchas (DejaVu en Linux), cuyo
+     derrame expandiría el viewport del layout → scroll horizontal. */
   .kpi-value {
-    font-size: 19px;
+    font-size: clamp(12.5px, 3.6vw, 19px);
   }
 
   .toolbar {
@@ -1371,6 +1440,12 @@ th.num {
 
 @media (max-width: 520px) {
   .header-date {
+    display: none;
+  }
+
+  /* En teléfono el nombre de la marca no cabe junto al chip de usuario:
+     queda el logo (la vista activa ya se ve en la barra inferior). */
+  .header-brand-name {
     display: none;
   }
 
@@ -1746,12 +1821,16 @@ tr.row-click:focus-visible {
     overflow: visible;
   }
 
+  /* Tablas apiladas en tarjetas: sin el min-width del modo tabla
+     (720px/640px), que aquí empujaría todo el documento más allá del
+     viewport del teléfono. */
   .table-wrap table,
   .table-wrap tbody,
   .table-wrap tr,
   .table-wrap td {
     display: block;
     width: 100%;
+    min-width: 0;
   }
 
   .table-wrap thead {

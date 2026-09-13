@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::models::audit::{AuditEntry, DocumentPrintCount};
+use crate::models::audit::{AuditEntry, DocumentPrintCount, EntityPrintTotal};
 use crate::repositories::audit as audit_repo;
 use crate::state::AppState;
 
@@ -80,6 +80,31 @@ pub async fn get_document_prints(
                     count,
                     last_printed_at,
                 })
+                .collect()
+        })
+}
+
+/// Total de impresiones de documentos por código de entidad, filtrado por
+/// prefijo («PAC-» pacientes, «CIR-» cirugías): alimenta la columna
+/// «Impresiones» de los listados con una sola consulta. Requiere sesión
+/// (solo lectura); devuelve solo códigos con impresiones registradas.
+#[tauri::command]
+pub async fn get_print_totals(
+    state: State<'_, AppState>,
+    prefix: String,
+) -> Result<Vec<EntityPrintTotal>, AppError> {
+    state.require_session()?;
+    let prefix = prefix.trim().to_uppercase();
+    if prefix.is_empty() || !prefix.ends_with('-') {
+        return Err(AppError::validation(
+            "El prefijo es obligatorio y debe terminar en '-' (p. ej. PAC- o CIR-)",
+        ));
+    }
+    let mut pooled = state.pool.acquire()?;
+    audit_repo::print_totals_by_prefix(pooled.conn(), &prefix)
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(entity_code, count)| EntityPrintTotal { entity_code, count })
                 .collect()
         })
 }

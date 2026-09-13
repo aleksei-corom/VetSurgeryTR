@@ -16,6 +16,7 @@ import type {
   CreateVetInput,
   DashboardData,
   DbStatus,
+  EntityPrintTotal,
   FollowUp,
   InventoryItem,
   InventoryItemDetail,
@@ -187,6 +188,14 @@ export function logDocumentPrint(input: {
  *  detalle de cirugía. */
 export function getDocumentPrints(entityCode: string): Promise<DocumentPrintCount[]> {
   return call("get_document_prints", { entityCode });
+}
+
+/** Total de impresiones por código de entidad con un prefijo («PAC-»
+ *  pacientes, «CIR-» cirugías): una consulta para toda la página — alimenta
+ *  la columna «Impresiones» del listado. Solo devuelve códigos con
+ *  impresiones registradas. */
+export function getPrintTotals(prefix: string): Promise<EntityPrintTotal[]> {
+  return call("get_print_totals", { prefix });
 }
 
 // ============================ Sesión local (login) ==========================

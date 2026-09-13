@@ -114,6 +114,29 @@ pub fn print_counts_for(
     Ok(rows)
 }
 
+/// Total de impresiones por código de entidad con el prefijo dado (p. ej.
+/// «PAC-» para pacientes): una sola consulta agrupada para alimentar la
+/// columna «Impresiones» del listado — en vez de N consultas individuales.
+/// Solo devuelve códigos con al menos una impresión.
+pub fn print_totals_by_prefix(
+    conn: &mut SimpleConnection,
+    prefix: &str,
+) -> Result<Vec<(String, i32)>, AppError> {
+    let like = format!("{prefix}%");
+    let rows: Vec<(String, i32)> = conn
+        .query(
+            "SELECT a.ENTITY_CODE, CAST(COUNT(*) AS INTEGER)
+             FROM AUDIT_LOG a
+             WHERE a.ENTITY_TYPE = 'DOCUMENTO'
+               AND a.ACTION = 'IMPRIMIR'
+               AND a.ENTITY_CODE LIKE ?
+             GROUP BY a.ENTITY_CODE",
+            (&like,),
+        )
+        .map_err(AppError::from)?;
+    Ok(rows)
+}
+
 /// Bitácora con filtros opcionales: entidad, acción y búsqueda en código y
 /// detalle. Más recientes primero.
 pub fn list(

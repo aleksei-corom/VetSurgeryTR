@@ -14,7 +14,7 @@ mod tests;
 
 use tauri::Manager;
 
-use crate::commands::audit::{get_document_prints, list_audit_log, log_document_print};
+use crate::commands::audit::{get_document_prints, get_print_totals, list_audit_log, log_document_print};
 use crate::commands::auth::{
     change_password, create_user, get_session, list_users, login, logout, reset_user_password,
     set_user_active, update_user,
@@ -82,6 +82,7 @@ pub fn run() {
             list_audit_log,
             log_document_print,
             get_document_prints,
+            get_print_totals,
             // ---- Dashboard ----
             get_dashboard,
             // ---- Propietarios ----

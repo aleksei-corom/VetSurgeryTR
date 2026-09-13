@@ -231,7 +231,18 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         </div>
       </section>
 
-      <section className="mt-4" aria-label="Agenda, alertas y evolución" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(450px, 1fr))", gap: "1rem", alignItems: "start" }}>
+      <section
+        className="mt-4"
+        aria-label="Agenda, alertas y evolución"
+        style={{
+          display: "grid",
+          /* 450px en dos columnas en escritorio; bajo 520px, una columna
+             que respeta el ancho del teléfono (minmax(450px) empujaría). */
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(450px, 100%), 1fr))",
+          gap: "1rem",
+          alignItems: "start",
+        }}
+      >
         {/* ---------- Próximas cirugías ---------- */}
         <div className="card">
           <div className="card-head">
@@ -341,7 +352,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                   const max = Math.max(...data.documentPrints.map((x) => x.count), 1);
                   return (
                     <div key={d.document} className="bar-row">
-                      <span className="bar-month" style={{ maxWidth: "38%" }} title={d.document}>
+                      <span className="bar-month ellipsis" style={{ maxWidth: "38%" }} title={d.document}>
                         {d.document}
                       </span>
                       <span className="bar-track">

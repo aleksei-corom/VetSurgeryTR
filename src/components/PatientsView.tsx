@@ -2,7 +2,7 @@
 // quirúrgico) + alta y edición. Los modales usan las primitivas compartidas.
 import { useState } from "react";
 import { SPECIES_OPTIONS, type Patient } from "@/types";
-import { getPatient, listPatients } from "@/lib/ipc";
+import { getPatient, getPrintTotals, listPatients } from "@/lib/ipc";
 import { fmtAge, fmtDate, fmtQty, fmtSex } from "@/lib/format";
 import { useAsync, useDebounced } from "@/lib/use-async";
 import { useToast } from "./ui";
@@ -31,6 +31,12 @@ export default function PatientsView() {
   );
 
   const patients = data ?? [];
+
+  // Total de impresiones de documentos por código PAC- (una consulta para
+  // toda la página): alimenta la columna «Impresiones». Se recarga con el
+  // listado y al volver del detalle, donde se acaban de imprimir documentos.
+  const printTotals = useAsync(() => getPrintTotals("PAC-"), [data]);
+  const printsByCode = new Map((printTotals.data ?? []).map((t) => [t.entityCode, t.count]));
 
   return (
     <div>
@@ -131,6 +137,7 @@ export default function PatientsView() {
                 <th>Propietario</th>
                 <th>Edad</th>
                 <th className="num">Cirugías</th>
+                <th className="num">Impresiones</th>
                 <th>Estado</th>
                 <th aria-label="Abrir" />
               </tr>
@@ -179,6 +186,13 @@ export default function PatientsView() {
                   </td>
                   <td data-label="Cirugías" className="num">
                     {p.surgeryCount}
+                  </td>
+                  <td
+                    data-label="Impresiones"
+                    className="num"
+                    title={printsByCode.get(p.code) ? `${printsByCode.get(p.code)} documento(s) impreso(s) para ${p.code}` : undefined}
+                  >
+                    {printsByCode.get(p.code) ?? "—"}
                   </td>
                   <td data-label="Estado">
                     {p.active ? (

@@ -859,6 +859,22 @@ fn smoke_runtime_completo_con_firebird_real() {
             counts.len()
         );
 
+        // Totales por prefijo (columna «Impresiones» del listado): el PAC con
+        // historia impresa aparece; un prefijo sin impresiones vuelve vacío.
+        let pac_totals =
+            repositories::audit::print_totals_by_prefix(conn, "PAC-").unwrap();
+        assert!(
+            pac_totals.iter().any(|(code, n)| code == "PAC-2026-0001" && *n >= 1),
+            "total del PAC-2026-0001 con su historia clínica impresa: {pac_totals:?}"
+        );
+        let none_totals =
+            repositories::audit::print_totals_by_prefix(conn, "XYZ-").unwrap();
+        assert!(none_totals.is_empty(), "prefijo sin impresiones → vacío: {none_totals:?}");
+        println!(
+            "✔ Totales de impresión por prefijo (PAC-): {} código(s) con impresiones OK",
+            pac_totals.len()
+        );
+
         // Dashboard: la tarjeta «Documentos impresos» debe reflejar las 2
         // impresiones recién registradas, agrupadas por tipo de documento.
         let dash = repositories::dashboard::get_dashboard(conn).unwrap();
